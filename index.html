@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AeroWing 3D - Motion Controlled Bird Flight Game</title>
+    <meta name="description" content="Experience 3D flight through a floating sky archipelago using real-time webcam motion controls. Clap your hands to flap and soar, tilt your hands like wings to bank and glide." />
+    
+    <!-- Google Fonts: Outfit (modern geometric sans) + JetBrains Mono (flight instruments) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@300;400;600;700;800&display=swap" rel="stylesheet" />
+    
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <!-- 3D WebGL Canvas Viewport -->
+    <canvas id="game-canvas"></canvas>
+
+    <!-- Speed Dive Lines Overlay -->
+    <div id="speed-lines-overlay" class="speed-lines"></div>
+
+    <!-- Cockpit & Flight HUD -->
+    <header class="hud-topbar" id="hud-topbar">
+      <!-- Waypoint Progress Widget -->
+      <div class="hud-widget progress-widget" id="widget-waypoint">
+        <div class="widget-label">WAYPOINT COURSE</div>
+        <div class="progress-bar-container">
+          <div id="ring-progress-bar" class="progress-bar-fill"></div>
+        </div>
+        <div class="widget-value-sm" id="hud-ring-count">0 / 16</div>
+      </div>
+
+      <!-- Navigation Compass Radar -->
+      <div class="hud-widget compass-widget" id="widget-compass">
+        <div class="compass-dial">
+          <div class="compass-north">N</div>
+          <div id="compass-arrow" class="compass-needle"></div>
+        </div>
+        <div class="widget-label">WAYPOINT BEACON</div>
+      </div>
+
+      <!-- Flight Time & Score -->
+      <div class="hud-widget score-widget" id="widget-score">
+        <div class="timer-display" id="hud-timer">00:00</div>
+        <div class="score-display" id="hud-score">0</div>
+        <div class="combo-badge" id="hud-combo" style="display: none;">x1 COMBO!</div>
+      </div>
+    </header>
+
+    <!-- Aerodynamic Cockpit Gauges (Bottom Left) -->
+    <section class="hud-gauges-left" id="hud-flight-gauges">
+      <!-- Airspeed Indicator -->
+      <div class="instrument-card glass-panel" id="gauge-airspeed">
+        <div class="instrument-header">
+          <span class="instrument-icon">⚡</span>
+          <span class="instrument-title">AIRSPEED</span>
+        </div>
+        <div class="instrument-body">
+          <span id="hud-speed" class="instrument-value">79</span>
+          <span class="instrument-unit">KM/H</span>
+        </div>
+        <div class="dive-hint">DIVE TO GAIN SPEED</div>
+      </div>
+
+      <!-- Altimeter Indicator -->
+      <div class="instrument-card glass-panel" id="gauge-altitude">
+        <div class="instrument-header">
+          <span class="instrument-icon">▲</span>
+          <span class="instrument-title">ALTITUDE</span>
+        </div>
+        <div class="instrument-body">
+          <span id="hud-altitude" class="instrument-value">42m</span>
+          <span class="instrument-unit">MSL</span>
+        </div>
+        <div class="dive-hint">FLAP WINGS TO SOAR HIGH</div>
+      </div>
+    </section>
+
+    <!-- Center Screen Notifications & Clap Alert -->
+    <div id="hud-notification" class="hud-notification"></div>
+
+    <!-- Bottom Controls & System Status -->
+    <footer class="hud-bottombar" id="hud-bottombar">
+      <!-- Status Badge -->
+      <div class="hud-status-badge glass-panel" id="tracking-status-badge">
+        Initializing camera...
+      </div>
+
+      <!-- Quick Action Controls -->
+      <div class="hud-action-buttons">
+        <button id="btn-restart-flight" class="btn-hud btn-restart" aria-label="Restart Flight (R)">
+          <span class="btn-icon">🔄</span>
+          <span>Restart (R)</span>
+        </button>
+        <button id="btn-toggle-camera" class="btn-hud" aria-label="Toggle Camera Motion Mode">
+          <span class="btn-icon">📷</span>
+          <span id="btn-camera-text">Camera Motion</span>
+        </button>
+        <button id="btn-toggle-audio" class="btn-hud" aria-label="Toggle Audio Mute">
+          <span class="btn-icon" id="audio-icon">🔊</span>
+          <span id="audio-text">Audio ON</span>
+        </button>
+        <button id="btn-open-help" class="btn-hud" aria-label="Controls & Calibration Help">
+          <span class="btn-icon">⚙️</span>
+          <span>Controls</span>
+        </button>
+      </div>
+    </footer>
+
+    <!-- Webcam Picture-In-Picture HUD (Bottom Right) -->
+    <aside class="pip-webcam-container glass-panel" id="pip-webcam-container">
+      <div class="pip-header">
+        <span class="pip-indicator live"></span>
+        <span class="pip-title">MOTION CONTROLLER</span>
+        <button id="btn-minimize-pip" class="pip-toggle" aria-label="Minimize webcam view">_</button>
+      </div>
+      <div class="pip-viewport">
+        <!-- Hidden video element capturing stream -->
+        <video id="webcam-video" playsinline muted autoplay></video>
+        <!-- Canvas overlay with mirror video + hand landmarks + clap meter -->
+        <canvas id="webcam-overlay"></canvas>
+      </div>
+      <div class="pip-controls-guide">
+        <span>🪽 Flap Wings</span>
+        <span>✈️ Tilt to Bank</span>
+      </div>
+    </aside>
+
+    <!-- Interactive Welcome / Start Modal -->
+    <div id="welcome-modal" class="game-modal-backdrop visible">
+      <div class="game-modal-card glass-panel-modal">
+        <div class="modal-badge">3D MOTION GAME</div>
+        <h1 class="modal-title">AEROWING 3D</h1>
+        <p class="modal-subtitle">Fly through the floating sky archipelago using your body & wings</p>
+
+        <div class="instructions-grid">
+          <div class="instruction-card">
+            <div class="instruction-icon">🪽</div>
+            <h3>Flap Wings Like a Bird</h3>
+            <p>Move your arms/hands up & down like a bird flapping wings to generate upward lift force!</p>
+          </div>
+          <div class="instruction-card">
+            <div class="instruction-icon">✈️</div>
+            <h3>Airplane Wings</h3>
+            <p>Tilt your hands like airplane wings (left hand up, right hand down) to bank and roll smoothly.</p>
+          </div>
+          <div class="instruction-card">
+            <div class="instruction-icon">🦅</div>
+            <h3>Dive & Glide</h3>
+            <p>Lower your hands to enter a steep dive for turbo speed; raise hands to glide upward on thermals.</p>
+          </div>
+          <div class="instruction-card">
+            <div class="instruction-icon">⌨️</div>
+            <h3>Keyboard Fallback</h3>
+            <p><kbd>Space</kbd> to Flap Wings &bull; <kbd>A</kbd>/<kbd>D</kbd> to Bank &bull; <kbd>W</kbd>/<kbd>S</kbd> to Pitch &bull; <kbd>Mouse</kbd> to Steer.</p>
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <button id="btn-start-game" class="btn-primary-glow">
+            <span>START FLIGHT & CALIBRATION</span>
+            <span class="btn-arrow">➔</span>
+          </button>
+          <button id="btn-start-keyboard" class="btn-secondary-flat">
+            Play with Keyboard & Mouse Only
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pre-Flight Controller Check / Calibration Modal -->
+    <div id="calibration-modal" class="game-modal-backdrop">
+      <div class="game-modal-card glass-panel-modal calibration-card">
+        <div class="modal-badge">PRE-FLIGHT CALIBRATION</div>
+        <h2 class="modal-title-sm">CONTROLLER CHECK</h2>
+        <p class="modal-subtitle">Pastikan kamera membaca gerakan lengan Anda sebelum lepas landas</p>
+
+        <!-- Step Checklist -->
+        <div class="calibration-checklist">
+          <!-- Step 1: Body Detection -->
+          <div class="calib-item" id="calib-step-1">
+            <div class="calib-icon-box">👤</div>
+            <div class="calib-info">
+              <div class="calib-title">1. Deteksi Posisi Tubuh</div>
+              <div class="calib-desc">Posisikan diri agar bahu dan kedua lengan tampak di kamera</div>
+            </div>
+            <div class="calib-badge pending" id="calib-badge-1">Menunggu...</div>
+          </div>
+
+          <!-- Step 2: Horizontal Glide Wings -->
+          <div class="calib-item" id="calib-step-2">
+            <div class="calib-icon-box">↔️</div>
+            <div class="calib-info">
+              <div class="calib-title">2. Rentangkan Sayap Lurus (Gliding)</div>
+              <div class="calib-desc">Rentangkan kedua lengan mendatar sejajar bahu (tahan 1 detik)</div>
+              <div class="calib-progress-track">
+                <div class="calib-progress-bar" id="calib-progress-horizontal"></div>
+              </div>
+            </div>
+            <div class="calib-badge pending" id="calib-badge-2">Siap</div>
+          </div>
+
+          <!-- Step 3: Bank / Tilt Turn Test -->
+          <div class="calib-item" id="calib-step-3">
+            <div class="calib-icon-box">🔄</div>
+            <div class="calib-info">
+              <div class="calib-title">3. Uji Kemiringan / Belok</div>
+              <div class="calib-desc">Miringkan lengan seperti sayap pesawat ke kiri dan ke kanan</div>
+              <div class="calib-subchecks">
+                <span class="subcheck-badge" id="subcheck-roll-left">Belok Kiri [ ]</span>
+                <span class="subcheck-badge" id="subcheck-roll-right">Belok Kanan [ ]</span>
+              </div>
+            </div>
+            <div class="calib-badge pending" id="calib-badge-3">Belum</div>
+          </div>
+
+          <!-- Step 4: Flap Test (Option A) -->
+          <div class="calib-item" id="calib-step-4">
+            <div class="calib-icon-box">🪽</div>
+            <div class="calib-info">
+              <div class="calib-title">4. Uji Kepakan Sayap (Flap)</div>
+              <div class="calib-desc">Ayunkan kedua tangan ke bawah dengan cepat untuk uji daya angkat</div>
+            </div>
+            <div class="calib-badge pending" id="calib-badge-4">Ayunkan</div>
+          </div>
+        </div>
+
+        <!-- Live Telemetry & Feedback Banner -->
+        <div class="calib-feedback-box" id="calib-feedback">
+          <div class="feedback-pulse"></div>
+          <span id="calib-status-msg">Menghubungkan ke kamera & membaca postur tubuh...</span>
+        </div>
+
+        <!-- Action Footer -->
+        <div class="calib-footer">
+          <button id="btn-skip-calibration" class="btn-skip-glow" aria-label="Lewati Kalibrasi dan Langsung Terbang">
+            <span>⏩ Lewati & Langsung Terbang</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3... 2... 1... SOAR! Countdown Overlay -->
+    <div id="countdown-overlay" class="countdown-overlay">
+      <div id="countdown-number" class="countdown-number">3</div>
+    </div>
+
+    <!-- Controls & Calibration Help Modal -->
+    <div id="help-modal" class="game-modal-backdrop">
+      <div class="game-modal-card glass-panel-modal">
+        <h2 class="modal-title-sm">Motion Controls & Mechanics</h2>
+        <div class="mechanics-list">
+          <div class="mechanic-item">
+            <span class="m-icon">⭕</span>
+            <div>
+              <strong>Waypoint Rings:</strong> Fly through sequential glowing toruses to maintain speed and build your combo multiplier.
+            </div>
+          </div>
+          <div class="mechanic-item">
+            <span class="m-icon">🌀</span>
+            <div>
+              <strong>Updraft Thermals:</strong> Soar into the spiraling blue particle columns around floating islands to gain free altitude without flapping.
+            </div>
+          </div>
+          <div class="mechanic-item">
+            <span class="m-icon">🚀</span>
+            <div>
+              <strong>Cyan Boost Rings:</strong> Fly through cyan rings to receive instantaneous turbo forward airspeed!
+            </div>
+          </div>
+        </div>
+        <button id="btn-close-help" class="btn-primary-glow" style="margin-top: 1.5rem; width: 100%;">
+          Close & Resume
+        </button>
+      </div>
+    </div>
+
+    <!-- Victory / Course Completed Modal -->
+    <div id="victory-modal" class="game-modal-backdrop">
+      <div class="game-modal-card glass-panel-modal victory-card">
+        <div class="victory-crown">🏆</div>
+        <h2 class="modal-title">COURSE COMPLETED!</h2>
+        <p class="modal-subtitle">You have conquered the sky archipelago!</p>
+
+        <div class="stats-row">
+          <div class="stat-box">
+            <span class="stat-label">TIME</span>
+            <span id="victory-time" class="stat-num">01:42</span>
+          </div>
+          <div class="stat-box">
+            <span class="stat-label">TOTAL SCORE</span>
+            <span id="victory-score" class="stat-num">24,500</span>
+          </div>
+        </div>
+
+        <button id="btn-play-again" class="btn-primary-glow" style="margin-top: 1.5rem; width: 100%;">
+          Fly Course Again
+        </button>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
