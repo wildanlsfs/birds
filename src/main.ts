@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { AudioEngine } from './systems/AudioEngine';
-import { BirdMesh } from './entities/BirdMesh';
+import { BirdMesh, BirdProfile, BIRD_PROFILES } from './entities/BirdMesh';
 import { World } from './entities/World';
 import { WaypointManager } from './entities/Waypoints';
 import { FlightPhysics, FlightInput } from './systems/FlightPhysics';
@@ -28,6 +28,11 @@ class Game {
   private countdownActive = false;
   private lastTime = performance.now();
   private controlMode: 'camera' | 'keyboard' = 'camera';
+  private currentBirdType: 'small' | 'medium' | 'large' = 'medium';
+  private feathersCollected = 0;
+  private isGameOver = false;
+  private cameraShakeTime = 0;
+  private cameraShakeIntensity = 0;
 
   // Keyboard / Mouse input states
   private keyState = {
@@ -388,6 +393,89 @@ class Game {
     btnPlayAgain.addEventListener('click', () => {
       this.restartGame();
     });
+
+    // Bird Selection in Welcome Modal
+    document.querySelectorAll('.bird-card-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const type = (btn as HTMLElement).dataset.bird as 'small' | 'medium' | 'large';
+        if (type) {
+          this.audio.init();
+          this.selectBirdProfile(type);
+        }
+      });
+    });
+
+    // Hangar Modal (Species Selection)
+    const btnOpenHangar = document.getElementById('btn-open-hangar');
+    const hangarModal = document.getElementById('hangar-modal')!;
+    const btnCloseHangar = document.getElementById('btn-close-hangar')!;
+
+    btnOpenHangar?.addEventListener('click', () => {
+      this.audio.init();
+      hangarModal.classList.add('visible');
+    });
+
+    btnCloseHangar?.addEventListener('click', () => {
+      hangarModal.classList.remove('visible');
+    });
+
+    document.querySelectorAll('.hangar-bird-card .btn-select-bird').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        const targetBtn = e.currentTarget as HTMLElement;
+        const type = targetBtn.dataset.bird as 'small' | 'medium' | 'large';
+        if (type) {
+          this.audio.init();
+          this.selectBirdProfile(type);
+          this.hud.showNotification(`🦅 Memilih ${BIRD_PROFILES[type].name}!`, 'boost');
+        }
+      });
+    });
+
+    // Game Over Crash Modal Buttons
+    const btnRetryCrash = document.getElementById('btn-retry-crash');
+    btnRetryCrash?.addEventListener('click', () => {
+      this.hud.hideGameOver();
+      this.restartGame();
+    });
+
+    const btnChangeBirdCrash = document.getElementById('btn-change-bird-crash');
+    btnChangeBirdCrash?.addEventListener('click', () => {
+      this.hud.hideGameOver();
+      hangarModal.classList.add('visible');
+    });
+  }
+
+  private selectBirdProfile(type: 'small' | 'medium' | 'large'): void {
+    this.currentBirdType = type;
+    const profile = BIRD_PROFILES[type];
+    if (!profile) return;
+    this.bird.setProfile(profile);
+    this.physics.setProfile(profile);
+    this.audio.playBirdSelectSound();
+    this.hud.setBirdBadge(profile.name, profile.icon);
+
+    // Update active state in Welcome modal buttons
+    document.querySelectorAll('.bird-card-btn').forEach((btn) => {
+      const bType = (btn as HTMLElement).dataset.bird;
+      if (bType === type) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    });
+
+    // Update active state in Hangar modal cards
+    document.querySelectorAll('.hangar-bird-card').forEach((card) => {
+      const bType = (card as HTMLElement).dataset.bird;
+      const btn = card.querySelector('.btn-select-bird') as HTMLButtonElement;
+      if (bType === type) {
+        card.classList.add('selected');
+        if (btn) btn.textContent = 'Sedang Digunakan';
+      } else {
+        card.classList.remove('selected');
+        if (btn) btn.textContent = 'Pilih Burung Ini';
+      }
+    });
   }
 
   /**
@@ -570,8 +658,13 @@ class Game {
     console.log('🔄 Restarting flight course...');
     this.audio.init();
 
+    this.isGameOver = false;
+    this.feathersCollected = 0;
+    this.cameraShakeTime = 0;
+
     // 1. Reset flight physics & bird
     this.physics.reset();
+    this.physics.setProfile(BIRD_PROFILES[this.currentBirdType]);
     this.bird.update(
       0.016,
       this.physics.forwardSpeed,
@@ -594,6 +687,8 @@ class Game {
 
     // 4. Reset HUD & stats
     this.hud.reset();
+    this.hud.setFeathers(0);
+    this.hud.setBirdBadge(BIRD_PROFILES[this.currentBirdType].name, BIRD_PROFILES[this.currentBirdType].icon);
     this.lastMilestoneDistance = 0;
 
     // 5. Hide modals if any
@@ -601,6 +696,8 @@ class Game {
     document.getElementById('calibration-modal')?.classList.remove('visible');
     document.getElementById('victory-modal')?.classList.remove('visible');
     document.getElementById('help-modal')?.classList.remove('visible');
+    document.getElementById('hangar-modal')?.classList.remove('visible');
+    document.getElementById('game-over-modal')?.classList.remove('visible');
 
     // 6. Launch countdown and fly
     this.countdownActive = false;
@@ -626,6 +723,12 @@ class Game {
         this.updateCalibrationUI();
       }
       this.world.update(delta);
+      this.renderer.render(this.scene, this.camera);
+      return;
+    }
+
+    if (this.isGameOver) {
+      this.updateCamera(delta);
       this.renderer.render(this.scene, this.camera);
       return;
     }
@@ -728,12 +831,41 @@ class Game {
       this.physics.inUpdraft = false;
     }
 
-    // 4.5 Check Terrain & Island Collision (prevents penetrating ground or mountains)
+    // 4.3 Check Golden Feather Collectibles (+150 Score)
+    const featherCollected = this.world.checkFeatherCollection(this.physics.position);
+    if (featherCollected) {
+      this.feathersCollected += 1;
+      this.waypoints.totalScore += 150;
+      this.audio.playFeatherCollectSound();
+      this.hud.setFeathers(this.feathersCollected);
+      this.hud.showNotification('🪶 +150 BULU EMAS!', 'feather');
+    }
+
+    // 4.5 Check Terrain & Island Collision (prevents penetrating ground, handles fatal crash)
     const terrainHit = this.world.checkTerrainCollision(this.physics.position);
     if (terrainHit.hasCollision) {
-      this.physics.handleTerrainCollision(terrainHit.safeY);
-      this.audio.playFlap();
-      this.hud.showNotification('⛰️ Memantul Naik dari Daratan!', 'flap');
+      if (terrainHit.isFatal && !this.isGameOver) {
+        this.isGameOver = true;
+        this.physics.forwardSpeed = 0;
+        this.physics.velocity.set(0, -2, 0);
+        this.audio.playCrashSound();
+        this.cameraShakeTime = 0.85;
+        this.cameraShakeIntensity = 2.4;
+        const profile = BIRD_PROFILES[this.currentBirdType];
+        const dist = Math.max(0, Math.round(-this.physics.position.z));
+        this.hud.showGameOver(
+          terrainHit.reason,
+          dist,
+          this.waypoints.totalScore,
+          this.waypoints.collectedCount,
+          profile.name
+        );
+        this.hud.showNotification(`💥 CRASH! ${terrainHit.reason}`, 'warning');
+      } else if (!terrainHit.isFatal) {
+        this.physics.handleTerrainCollision(terrainHit.safeY);
+        this.audio.playFlap();
+        this.hud.showNotification('⛰️ Memantul Naik dari Daratan!', 'flap');
+      }
     }
 
     // 5. Check Waypoint Rings Pass-through (with magnetic slipstream assist)
@@ -809,6 +941,8 @@ class Game {
       currentRing: this.waypoints.collectedCount,
       totalRings: this.waypoints.rings.length,
       distance: distanceTraveled,
+      feathersCollected: this.feathersCollected,
+      birdName: `${BIRD_PROFILES[this.currentBirdType].icon} ${BIRD_PROFILES[this.currentBirdType].name}`,
       isFlapping,
       inUpdraft: this.physics.inUpdraft,
       isBoost: this.physics.boostTimer > 0,
@@ -851,6 +985,15 @@ class Game {
     this.camera.position.y = THREE.MathUtils.damp(this.camera.position.y, targetCamPos.y, 8.5, dt);
     this.camera.position.z = THREE.MathUtils.damp(this.camera.position.z, targetCamPos.z, 8.5, dt);
 
+    // Apply crash impact camera shake if active
+    if (this.cameraShakeTime > 0) {
+      this.cameraShakeTime -= delta;
+      const shakeAmt = this.cameraShakeIntensity * Math.max(0, this.cameraShakeTime / 0.85);
+      this.camera.position.x += (Math.random() - 0.5) * shakeAmt;
+      this.camera.position.y += (Math.random() - 0.5) * shakeAmt * 0.7;
+      this.camera.position.z += (Math.random() - 0.5) * shakeAmt;
+    }
+
     // Look at a focal point ahead of the bird
     const lookAheadDist = 18;
     const lookTarget = new THREE.Vector3(
@@ -860,8 +1003,6 @@ class Game {
     );
 
     this.camera.lookAt(lookTarget);
-
-    // Keep camera horizon stable to prevent dizziness (the 3D bird model banks visually)
 
     // Dynamic FOV widening during high speeds
     const targetFOV = 62 + Math.max(0, (this.physics.forwardSpeed - 22) * 0.45);

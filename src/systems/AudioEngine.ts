@@ -332,6 +332,108 @@ export class AudioEngine {
     osc.stop(now + 0.25);
   }
 
+  /**
+   * Dramatic Crash Explosion & Impact Thud (Game Over)
+   */
+  public playCrashSound(): void {
+    if (!this.ctx || !this.masterGain || this.isMuted) return;
+    this.ensureRunning();
+    const now = this.ctx.currentTime;
+
+    // 1. Deep Sub-bass Thud
+    const subOsc = this.ctx.createOscillator();
+    const subGain = this.ctx.createGain();
+    subOsc.type = 'sawtooth';
+    subOsc.frequency.setValueAtTime(160, now);
+    subOsc.frequency.exponentialRampToValueAtTime(25, now + 0.7);
+
+    subGain.gain.setValueAtTime(0.85, now);
+    subGain.gain.exponentialRampToValueAtTime(0.001, now + 0.85);
+
+    subOsc.connect(subGain);
+    subGain.connect(this.masterGain);
+    subOsc.start(now);
+    subOsc.stop(now + 0.9);
+
+    // 2. Impact Noise Burst (Foliage / Rock Crunch)
+    const noiseLen = this.ctx.sampleRate * 0.6;
+    const noiseBuf = this.ctx.createBuffer(1, noiseLen, this.ctx.sampleRate);
+    const data = noiseBuf.getChannelData(0);
+    for (let i = 0; i < noiseLen; i++) {
+      data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (this.ctx.sampleRate * 0.18));
+    }
+    const noiseSource = this.ctx.createBufferSource();
+    noiseSource.buffer = noiseBuf;
+
+    const noiseFilter = this.ctx.createBiquadFilter();
+    noiseFilter.type = 'lowpass';
+    noiseFilter.frequency.setValueAtTime(1200, now);
+    noiseFilter.frequency.linearRampToValueAtTime(150, now + 0.55);
+
+    const noiseGain = this.ctx.createGain();
+    noiseGain.gain.setValueAtTime(0.7, now);
+    noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+
+    noiseSource.connect(noiseFilter);
+    noiseFilter.connect(noiseGain);
+    noiseGain.connect(this.masterGain);
+    noiseSource.start(now);
+  }
+
+  /**
+   * Bird Selection harmonic chime
+   */
+  public playBirdSelectSound(): void {
+    if (!this.ctx || !this.masterGain || this.isMuted) return;
+    this.ensureRunning();
+    const now = this.ctx.currentTime;
+    const notes = [440, 554, 659, 880];
+
+    notes.forEach((freq, idx) => {
+      const t = now + idx * 0.055;
+      const osc = this.ctx!.createOscillator();
+      const gain = this.ctx!.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, t);
+
+      gain.gain.setValueAtTime(0.22, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+
+      osc.connect(gain);
+      gain.connect(this.masterGain!);
+      osc.start(t);
+      osc.stop(t + 0.38);
+    });
+  }
+
+  /**
+   * Golden Feather collection chime
+   */
+  public playFeatherCollectSound(): void {
+    if (!this.ctx || !this.masterGain || this.isMuted) return;
+    this.ensureRunning();
+    const now = this.ctx.currentTime;
+    const notes = [880, 1174, 1567, 1760];
+
+    notes.forEach((freq, idx) => {
+      const t = now + idx * 0.045;
+      const osc = this.ctx!.createOscillator();
+      const gain = this.ctx!.createGain();
+
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, t);
+
+      gain.gain.setValueAtTime(0.25, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+
+      osc.connect(gain);
+      gain.connect(this.masterGain!);
+      osc.start(t);
+      osc.stop(t + 0.32);
+    });
+  }
+
   public toggleMute(): boolean {
     this.isMuted = !this.isMuted;
     if (this.masterGain && this.ctx) {

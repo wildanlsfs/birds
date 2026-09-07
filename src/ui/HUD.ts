@@ -6,6 +6,8 @@ export interface HUDState {
   currentRing: number;
   totalRings: number;
   distance?: number;
+  feathersCollected?: number;
+  birdName?: string;
   isFlapping: boolean;
   inUpdraft: boolean;
   isBoost: boolean;
@@ -25,13 +27,27 @@ export class HUD {
   private compassArrowEl: HTMLElement;
   private notificationEl: HTMLElement;
   private trackingStatusEl: HTMLElement;
+  private timerEl: HTMLElement;
+
+  // Victory Modal
   private victoryModalEl: HTMLElement;
   private victoryTimeEl: HTMLElement;
   private victoryScoreEl: HTMLElement;
 
+  // Game Over Modal
+  private gameOverModalEl: HTMLElement;
+  private gameOverReasonEl: HTMLElement;
+  private gameOverDistEl: HTMLElement;
+  private gameOverScoreEl: HTMLElement;
+  private gameOverRingsEl: HTMLElement;
+  private gameOverBirdEl: HTMLElement;
+
+  // Optional Feathers and Bird Badge Elements
+  private feathersCountEl: HTMLElement | null;
+  private hudBirdBadgeEl: HTMLElement | null;
+
   private notifyTimer: number | null = null;
   private startTime = performance.now();
-  private timerEl: HTMLElement;
 
   constructor() {
     this.speedEl = document.getElementById('hud-speed')!;
@@ -43,14 +59,27 @@ export class HUD {
     this.compassArrowEl = document.getElementById('compass-arrow')!;
     this.notificationEl = document.getElementById('hud-notification')!;
     this.trackingStatusEl = document.getElementById('tracking-status-badge')!;
+    this.timerEl = document.getElementById('hud-timer')!;
+
+    // Victory
     this.victoryModalEl = document.getElementById('victory-modal')!;
     this.victoryTimeEl = document.getElementById('victory-time')!;
     this.victoryScoreEl = document.getElementById('victory-score')!;
-    this.timerEl = document.getElementById('hud-timer')!;
+
+    // Game Over
+    this.gameOverModalEl = document.getElementById('game-over-modal')!;
+    this.gameOverReasonEl = document.getElementById('game-over-reason')!;
+    this.gameOverDistEl = document.getElementById('game-over-distance')!;
+    this.gameOverScoreEl = document.getElementById('game-over-score')!;
+    this.gameOverRingsEl = document.getElementById('game-over-rings')!;
+    this.gameOverBirdEl = document.getElementById('game-over-bird')!;
+
+    this.feathersCountEl = document.getElementById('hud-feather-count');
+    this.hudBirdBadgeEl = document.getElementById('hud-bird-badge');
   }
 
   public update(state: HUDState): void {
-    // Airspeed (display in knots or km/h)
+    // Airspeed (display in km/h)
     const speedKmh = Math.round(state.speed * 3.6);
     this.speedEl.textContent = `${speedKmh}`;
     if (state.speed > 35) {
@@ -94,9 +123,19 @@ export class HUD {
     if (state.trackingStatus) {
       this.trackingStatusEl.textContent = state.trackingStatus;
     }
+
+    // Feathers Collected
+    if (this.feathersCountEl && state.feathersCollected !== undefined) {
+      this.feathersCountEl.textContent = `${state.feathersCollected}`;
+    }
+
+    // Active Bird Badge
+    if (this.hudBirdBadgeEl && state.birdName) {
+      this.hudBirdBadgeEl.textContent = state.birdName;
+    }
   }
 
-  public showNotification(text: string, type: 'flap' | 'boost' | 'updraft' | 'ring' | 'clap'): void {
+  public showNotification(text: string, type: 'flap' | 'boost' | 'updraft' | 'ring' | 'clap' | 'feather' | 'warning'): void {
     if (this.notifyTimer) {
       window.clearTimeout(this.notifyTimer);
     }
@@ -106,7 +145,21 @@ export class HUD {
 
     this.notifyTimer = window.setTimeout(() => {
       this.notificationEl.className = 'hud-notification';
-    }, 1200);
+    }, 1300);
+  }
+
+  public showGameOver(reason: string, distance: number, score: number, rings: number, birdName: string): void {
+    if (this.gameOverReasonEl) this.gameOverReasonEl.textContent = reason;
+    if (this.gameOverDistEl) this.gameOverDistEl.textContent = `${Math.round(distance)}m`;
+    if (this.gameOverScoreEl) this.gameOverScoreEl.textContent = score.toLocaleString();
+    if (this.gameOverRingsEl) this.gameOverRingsEl.textContent = `${rings}`;
+    if (this.gameOverBirdEl) this.gameOverBirdEl.textContent = birdName;
+
+    this.gameOverModalEl?.classList.add('visible');
+  }
+
+  public hideGameOver(): void {
+    this.gameOverModalEl?.classList.remove('visible');
   }
 
   public showVictory(score: number): void {
@@ -130,6 +183,20 @@ export class HUD {
     this.ringCountEl.textContent = '0 / 12';
     this.ringProgressEl.style.width = '0%';
     this.timerEl.textContent = '00:00';
-    this.victoryModalEl.classList.remove('visible');
+    if (this.feathersCountEl) this.feathersCountEl.textContent = '0';
+    this.victoryModalEl?.classList.remove('visible');
+    this.gameOverModalEl?.classList.remove('visible');
+  }
+
+  public setFeathers(count: number): void {
+    if (this.feathersCountEl) {
+      this.feathersCountEl.textContent = `${count}`;
+    }
+  }
+
+  public setBirdBadge(name: string, icon: string): void {
+    if (this.hudBirdBadgeEl) {
+      this.hudBirdBadgeEl.textContent = `${icon} ${name}`;
+    }
   }
 }

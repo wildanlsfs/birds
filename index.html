@@ -40,6 +40,15 @@
         <div class="widget-label">BEACON</div>
       </div>
 
+      <!-- Golden Feathers Widget -->
+      <div class="hud-widget feather-widget" id="widget-feather">
+        <div class="widget-label">FEATHERS</div>
+        <div class="feather-counter-box">
+          <span class="feather-icon">🪶</span>
+          <span id="hud-feather-count" class="widget-value-sm">0</span>
+        </div>
+      </div>
+
       <!-- Flight Time & Score -->
       <div class="hud-widget score-widget" id="widget-score">
         <div class="timer-display" id="hud-timer">00:00</div>
@@ -50,6 +59,11 @@
 
     <!-- Aerodynamic Cockpit Gauges (Bottom Left) -->
     <section class="hud-gauges-left" id="hud-flight-gauges">
+      <!-- Active Bird Badge -->
+      <div class="bird-hud-chip glass-panel" id="hud-bird-badge">
+        🦅 Elang Langit
+      </div>
+
       <!-- Airspeed Indicator -->
       <div class="instrument-card glass-panel" id="gauge-airspeed">
         <div class="instrument-header">
@@ -89,6 +103,10 @@
 
       <!-- Quick Action Controls -->
       <div class="hud-action-buttons">
+        <button id="btn-open-hangar" class="btn-hud" aria-label="Select Bird Species">
+          <span class="btn-icon">🦅</span>
+          <span class="btn-text">Burung</span>
+        </button>
         <button id="btn-restart-flight" class="btn-hud btn-restart" aria-label="Restart Flight (R)">
           <span class="btn-icon">🔄</span>
           <span class="btn-text">Restart</span>
@@ -177,6 +195,34 @@
             <div class="instruction-icon">📱⌨️</div>
             <h3>Touch & Keyboard</h3>
             <p><kbd>Space</kbd> or <b>Touch Button</b> to Flap &bull; <kbd>A</kbd>/<kbd>D</kbd> or <b>Touch Stick</b> to Bank &bull; <kbd>W</kbd>/<kbd>S</kbd> to Pitch.</p>
+          </div>
+        </div>
+
+        <!-- Bird Selection in Welcome Modal -->
+        <div class="welcome-bird-selection">
+          <div class="selection-heading">PILIH TIPE BURUNG ANDA:</div>
+          <div class="bird-selector-row">
+            <button type="button" class="bird-card-btn" data-bird="small">
+              <span class="bird-icon">🪽</span>
+              <div class="bird-meta">
+                <span class="bird-name">Walet Kilat</span>
+                <span class="bird-tag">Kecil / Lincah</span>
+              </div>
+            </button>
+            <button type="button" class="bird-card-btn active" data-bird="medium">
+              <span class="bird-icon">🦅</span>
+              <div class="bird-meta">
+                <span class="bird-name">Elang Langit</span>
+                <span class="bird-tag">Sedang / Seimbang</span>
+              </div>
+            </button>
+            <button type="button" class="bird-card-btn" data-bird="large">
+              <span class="bird-icon">🔥</span>
+              <div class="bird-meta">
+                <span class="bird-name">Garuda Phoenix</span>
+                <span class="bird-tag">Besar / Meluncur</span>
+              </div>
+            </button>
           </div>
         </div>
 
@@ -320,6 +366,112 @@
         <button id="btn-play-again" class="btn-primary-glow" style="margin-top: 1.5rem; width: 100%;">
           Fly Course Again
         </button>
+      </div>
+    </div>
+
+    <!-- Hangar / Bird Selection Modal -->
+    <div id="hangar-modal" class="game-modal-backdrop">
+      <div class="game-modal-card glass-panel-modal hangar-card">
+        <div class="modal-badge">FLIGHT HANGAR</div>
+        <h2 class="modal-title-sm">PILIH SPESIES BURUNG</h2>
+        <p class="modal-subtitle">Setiap burung memiliki keunggulan fisik, kelincahan, dan corak bulu unik</p>
+
+        <div class="hangar-birds-list" id="hangar-birds-list">
+          <!-- Small Bird -->
+          <div class="hangar-bird-card" data-bird="small">
+            <div class="h-card-header">
+              <span class="h-icon">🪽</span>
+              <div class="h-info">
+                <div class="h-title">Walet Kilat (Swift Colibri)</div>
+                <div class="h-tag small">KECIL / SUPER LINCAH</div>
+              </div>
+            </div>
+            <p class="h-desc">Bulu zamrud cerah. Berbelok sangat tajam di sela pepohonan hutan dan celah sempit.</p>
+            <div class="h-stat-bars">
+              <div class="h-stat"><span class="h-stat-lbl">Kecepatan</span><div class="h-bar"><div class="h-bar-fill" style="width: 82%;"></div></div></div>
+              <div class="h-stat"><span class="h-stat-lbl">Kelincahan</span><div class="h-bar"><div class="h-bar-fill gold" style="width: 98%;"></div></div></div>
+              <div class="h-stat"><span class="h-stat-lbl">Meluncur</span><div class="h-bar"><div class="h-bar-fill" style="width: 72%;"></div></div></div>
+            </div>
+            <button type="button" class="btn-select-bird" data-bird="small">Pilih Burung Ini</button>
+          </div>
+
+          <!-- Medium Bird -->
+          <div class="hangar-bird-card selected" data-bird="medium">
+            <div class="h-card-header">
+              <span class="h-icon">🦅</span>
+              <div class="h-info">
+                <div class="h-title">Elang Langit (Golden Falcon)</div>
+                <div class="h-tag medium">SEDANG / SEIMBANG</div>
+              </div>
+            </div>
+            <p class="h-desc">Bulu biru laut kerajaan dengan paruh emas. Keseimbangan sempurna kecepatan dan manuver.</p>
+            <div class="h-stat-bars">
+              <div class="h-stat"><span class="h-stat-lbl">Kecepatan</span><div class="h-bar"><div class="h-bar-fill" style="width: 88%;"></div></div></div>
+              <div class="h-stat"><span class="h-stat-lbl">Kelincahan</span><div class="h-bar"><div class="h-bar-fill" style="width: 85%;"></div></div></div>
+              <div class="h-stat"><span class="h-stat-lbl">Meluncur</span><div class="h-bar"><div class="h-bar-fill" style="width: 86%;"></div></div></div>
+            </div>
+            <button type="button" class="btn-select-bird" data-bird="medium">Sedang Digunakan</button>
+          </div>
+
+          <!-- Large Bird -->
+          <div class="hangar-bird-card" data-bird="large">
+            <div class="h-card-header">
+              <span class="h-icon">🔥</span>
+              <div class="h-info">
+                <div class="h-title">Garuda Phoenix (Mythic Phoenix)</div>
+                <div class="h-tag large">BESAR / SOARING GLIDER</div>
+              </div>
+            </div>
+            <p class="h-desc">Bulu merah kirmizi menyala. Bentang sayap raksasa, meluncur sangat awet dan menukik super kencang.</p>
+            <div class="h-stat-bars">
+              <div class="h-stat"><span class="h-stat-lbl">Kecepatan</span><div class="h-bar"><div class="h-bar-fill gold" style="width: 98%;"></div></div></div>
+              <div class="h-stat"><span class="h-stat-lbl">Kelincahan</span><div class="h-bar"><div class="h-bar-fill" style="width: 68%;"></div></div></div>
+              <div class="h-stat"><span class="h-stat-lbl">Meluncur</span><div class="h-bar"><div class="h-bar-fill gold" style="width: 98%;"></div></div></div>
+            </div>
+            <button type="button" class="btn-select-bird" data-bird="large">Pilih Burung Ini</button>
+          </div>
+        </div>
+
+        <button id="btn-close-hangar" class="btn-primary-glow" style="margin-top: 1.5rem; width: 100%;">
+          Tutup & Lanjutkan Terbang
+        </button>
+      </div>
+    </div>
+
+    <!-- Game Over / Flight Crashed Modal -->
+    <div id="game-over-modal" class="game-modal-backdrop">
+      <div class="game-modal-card glass-panel-modal game-over-card">
+        <div class="modal-badge badge-danger">💥 MISSION FAILED</div>
+        <h2 class="modal-title-danger">FLIGHT CRASHED!</h2>
+        <p class="modal-subtitle-danger" id="game-over-reason">Burung menabrak tebing batu</p>
+
+        <div class="game-over-stats-grid">
+          <div class="stat-box">
+            <span class="stat-label">JARAK TEMPUH</span>
+            <span id="game-over-distance" class="stat-num">0m</span>
+          </div>
+          <div class="stat-box">
+            <span class="stat-label">TOTAL SKOR</span>
+            <span id="game-over-score" class="stat-num">0</span>
+          </div>
+          <div class="stat-box">
+            <span class="stat-label">CINCIN WAYPOINT</span>
+            <span id="game-over-rings" class="stat-num">0</span>
+          </div>
+          <div class="stat-box">
+            <span class="stat-label">SPESIES BURUNG</span>
+            <span id="game-over-bird" class="stat-num-sm">Elang Langit</span>
+          </div>
+        </div>
+
+        <div class="modal-actions" style="margin-top: 1.5rem;">
+          <button id="btn-retry-crash" class="btn-primary-glow btn-retry-danger">
+            <span>🔄 COBA LAGI (RETRY)</span>
+          </button>
+          <button id="btn-change-bird-crash" class="btn-secondary-flat">
+            🦅 Ganti Tipe Burung (Hangar)
+          </button>
+        </div>
       </div>
     </div>
 

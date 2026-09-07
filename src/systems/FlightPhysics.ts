@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { BirdProfile } from '../entities/BirdMesh';
 
 export interface FlightInput {
   rollInput: number;     // -1 (turn left) to +1 (turn right)
@@ -13,7 +14,7 @@ export class FlightPhysics {
   // Position & Velocity in World Space
   public position = new THREE.Vector3(0, 25, 20);
   public velocity = new THREE.Vector3(0, 0, -16);
-  public forwardSpeed = 16; // m/s forward airspeed (calm, controllable cruise)
+  public forwardSpeed = 16; // m/s forward airspeed
 
   // Rotation Euler angles (Yaw, Pitch, Roll)
   public yaw = 0;   // Heading around Y (radians)
@@ -24,10 +25,14 @@ export class FlightPhysics {
   // Wing lift vertical impulse from flapping (decays over time)
   private verticalImpulse = 0;
 
-  // Physical parameters
-  private minSpeed = 5.0;     // Low minimum speed so player can fly slowly to take rings easily
-  private maxSpeed = 50.0;    // Maximum dive speed
-  private cruiseSpeed = 16.0;  // Calm cruise speed (57 km/h)
+  // Physical parameters (configurable via bird profiles)
+  public minSpeed = 5.0;
+  public maxSpeed = 50.0;
+  public cruiseSpeed = 16.0;
+  public turnRateMult = 1.0;
+  public flapLiftMult = 1.0;
+  public glideEfficiency = 1.0;
+  public birdScale = 1.0;
   private gravity = 9.8;
 
   // Active state timers
@@ -37,18 +42,30 @@ export class FlightPhysics {
 
   constructor() {}
 
+  public setProfile(profile: BirdProfile): void {
+    this.cruiseSpeed = profile.physics.cruiseSpeed;
+    this.minSpeed = profile.physics.minSpeed;
+    this.maxSpeed = profile.physics.maxSpeed;
+    this.turnRateMult = profile.physics.turnRateMult;
+    this.flapLiftMult = profile.physics.flapLift / 16.0;
+    this.glideEfficiency = profile.physics.glideEfficiency;
+    this.birdScale = profile.scale;
+    this.forwardSpeed = this.cruiseSpeed;
+  }
+
   /**
    * Apply flight input and integrate physics step
    */
   public update(delta: number, input: FlightInput): void {
     const dt = Math.min(delta, 0.1);
 
-    // 1. Handle Bird Wing Flap Impulse (Primary function: gain altitude / naik ke atas)
+    // 1. Handle Bird Wing Flap Impulse
     if (input.isFlapping) {
       const intensity = Math.max(0.7, input.flapIntensity || 1.0);
-      // Strong vertical lift force upward into the sky
-      this.verticalImpulse = Math.max(this.verticalImpulse + 11 * intensity, 16 * intensity);
-      // PURE ALTITUDE GAIN: Zero forward speed addition so player climbs without racing forward!
+      this.verticalImpulse = Math.max(
+        this.verticalImpulse + 11 * intensity * this.flapLiftMult,
+        16 * intensity * this.flapLiftMult
+      );
       this.flapTimer = 0.45;
     }
 
@@ -87,16 +104,12 @@ export class FlightPhysics {
     this.roll = THREE.MathUtils.damp(this.roll, targetRoll, 8.0, dt);
 
     // Incremental / Progressive Turn Rate:
-    // When banking, turning rate starts slow and progressively accelerates into the turn.
-    // This prevents sudden jarring turns and gives a smooth, natural carving curve!
-    const targetTurnRate = this.roll * 2.3;
+    // Scaled by the active bird's agility profile
+    const targetTurnRate = this.roll * 2.3 * this.turnRateMult;
     const turnDampFactor = Math.abs(targetTurnRate) > Math.abs(this.currentTurnRate) ? 2.4 : 4.2;
     this.currentTurnRate = THREE.MathUtils.damp(this.currentTurnRate, targetTurnRate, turnDampFactor, dt);
     this.yaw += this.currentTurnRate * dt;
 
-    // 3. Pitch (Going DOWN vs Going UP)
-    // Convention:
-    // input.pitchInput < 0 -> DIVE / SINK DOWN (targetPitch < 0, nose tilts down gently)
     // 3. Pitch (Going DOWN vs Going UP)
     // Convention:
     // input.pitchInput < 0 -> DIVE / SINK DOWN (targetPitch < 0, nose points down)
@@ -108,10 +121,10 @@ export class FlightPhysics {
     this.pitch = THREE.MathUtils.lerp(this.pitch, targetPitch, dt * 5.0);
 
     // 4. Airspeed dynamics:
-    // Diving accelerates speed naturally with gravity (from cruise ~16 m/s up to ~22-24 m/s)
+    // Diving accelerates speed naturally with gravity (from cruise speed up to max dive)
     if (this.pitch < 0) {
-      const diveAccel = -Math.sin(this.pitch) * 8.5; // Natural gravitational forward component
-      this.forwardSpeed = THREE.MathUtils.clamp(this.forwardSpeed + diveAccel * dt, this.cruiseSpeed, 24.0);
+      const diveAccel = -Math.sin(this.pitch) * 9.5;
+      this.forwardSpeed = THREE.MathUtils.clamp(this.forwardSpeed + diveAccel * dt, this.cruiseSpeed, this.maxSpeed);
     } else if (!input.isBraking) {
       // Climbing nose up bleeds off excess speed
       const climbDrag = Math.sin(this.pitch) * this.gravity * 1.5;
@@ -133,10 +146,8 @@ export class FlightPhysics {
     const dirZ = -Math.cos(this.yaw) * Math.cos(this.pitch);
 
     // Aerodynamic Glide Lift & Gravity:
-    // When pitching nose down (pitch < 0), wing lift is reduced proportionally
-    // so the bird drops and dives naturally into the lower rings
     const speedRatio = this.forwardSpeed / this.cruiseSpeed;
-    let dynamicLift = Math.min(1.4, speedRatio * speedRatio) * this.gravity;
+    let dynamicLift = Math.min(1.4, speedRatio * speedRatio) * this.gravity * this.glideEfficiency;
 
     if (this.pitch < 0) {
       // Lowering arms / nose down cuts lift by up to 88%
