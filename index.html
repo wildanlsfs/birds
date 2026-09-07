@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>AeroWing 3D - Motion Controlled Bird Flight Game</title>
     <meta name="description" content="Experience 3D flight through a floating sky archipelago using real-time webcam motion controls. Clap your hands to flap and soar, tilt your hands like wings to bank and glide." />
     
@@ -24,7 +24,7 @@
     <header class="hud-topbar" id="hud-topbar">
       <!-- Waypoint Progress Widget -->
       <div class="hud-widget progress-widget" id="widget-waypoint">
-        <div class="widget-label">WAYPOINT COURSE</div>
+        <div class="widget-label">WAYPOINTS</div>
         <div class="progress-bar-container">
           <div id="ring-progress-bar" class="progress-bar-fill"></div>
         </div>
@@ -37,7 +37,7 @@
           <div class="compass-north">N</div>
           <div id="compass-arrow" class="compass-needle"></div>
         </div>
-        <div class="widget-label">WAYPOINT BEACON</div>
+        <div class="widget-label">BEACON</div>
       </div>
 
       <!-- Flight Time & Score -->
@@ -91,19 +91,19 @@
       <div class="hud-action-buttons">
         <button id="btn-restart-flight" class="btn-hud btn-restart" aria-label="Restart Flight (R)">
           <span class="btn-icon">🔄</span>
-          <span>Restart (R)</span>
+          <span class="btn-text">Restart</span>
         </button>
         <button id="btn-toggle-camera" class="btn-hud" aria-label="Toggle Camera Motion Mode">
           <span class="btn-icon">📷</span>
-          <span id="btn-camera-text">Camera Motion</span>
+          <span id="btn-camera-text" class="btn-text">Camera</span>
         </button>
         <button id="btn-toggle-audio" class="btn-hud" aria-label="Toggle Audio Mute">
           <span class="btn-icon" id="audio-icon">🔊</span>
-          <span id="audio-text">Audio ON</span>
+          <span id="audio-text" class="btn-text">Sound</span>
         </button>
         <button id="btn-open-help" class="btn-hud" aria-label="Controls & Calibration Help">
           <span class="btn-icon">⚙️</span>
-          <span>Controls</span>
+          <span class="btn-text">Help</span>
         </button>
       </div>
     </footer>
@@ -127,12 +127,35 @@
       </div>
     </aside>
 
+    <!-- Mobile / Touch Virtual Flight Controls Layer -->
+    <div id="touch-controls-layer" class="touch-controls-layer">
+      <!-- Left side: Steer Thumbpad / Virtual Joystick -->
+      <div id="touch-stick-zone" class="touch-stick-zone">
+        <div id="touch-stick-base" class="touch-stick-base">
+          <div id="touch-stick-knob" class="touch-stick-knob"></div>
+          <span class="stick-hint">STEER / PITCH</span>
+        </div>
+      </div>
+
+      <!-- Right side: Flight Action Buttons (Flap & Airbrake) -->
+      <div class="touch-actions-zone">
+        <button id="btn-touch-brake" class="btn-touch-circle btn-touch-brake" aria-label="Air Brake">
+          <span class="touch-btn-icon">🛑</span>
+          <span class="touch-btn-text">BRAKE</span>
+        </button>
+        <button id="btn-touch-flap" class="btn-touch-circle btn-touch-flap" aria-label="Flap Wings">
+          <span class="touch-btn-icon">🪽</span>
+          <span class="touch-btn-text">FLAP</span>
+        </button>
+      </div>
+    </div>
+
     <!-- Interactive Welcome / Start Modal -->
     <div id="welcome-modal" class="game-modal-backdrop visible">
       <div class="game-modal-card glass-panel-modal">
-        <div class="modal-badge">3D MOTION GAME</div>
+        <div class="modal-badge">3D FLIGHT SIMULATOR</div>
         <h1 class="modal-title">AEROWING 3D</h1>
-        <p class="modal-subtitle">Fly through the floating sky archipelago using your body & wings</p>
+        <p class="modal-subtitle">Fly through the floating sky archipelago using your body, touch, or keys</p>
 
         <div class="instructions-grid">
           <div class="instruction-card">
@@ -148,22 +171,22 @@
           <div class="instruction-card">
             <div class="instruction-icon">🦅</div>
             <h3>Dive & Glide</h3>
-            <p>Lower your hands to enter a steep dive for turbo speed; raise hands to glide upward on thermals.</p>
+            <p>Lower your hands or pitch down to enter a steep dive for turbo speed; soar on thermals.</p>
           </div>
           <div class="instruction-card">
-            <div class="instruction-icon">⌨️</div>
-            <h3>Keyboard Fallback</h3>
-            <p><kbd>Space</kbd> to Flap Wings &bull; <kbd>A</kbd>/<kbd>D</kbd> to Bank &bull; <kbd>W</kbd>/<kbd>S</kbd> to Pitch &bull; <kbd>Mouse</kbd> to Steer.</p>
+            <div class="instruction-icon">📱⌨️</div>
+            <h3>Touch & Keyboard</h3>
+            <p><kbd>Space</kbd> or <b>Touch Button</b> to Flap &bull; <kbd>A</kbd>/<kbd>D</kbd> or <b>Touch Stick</b> to Bank &bull; <kbd>W</kbd>/<kbd>S</kbd> to Pitch.</p>
           </div>
         </div>
 
         <div class="modal-actions">
           <button id="btn-start-game" class="btn-primary-glow">
-            <span>START FLIGHT & CALIBRATION</span>
+            <span>START FLIGHT (CAMERA MOTION)</span>
             <span class="btn-arrow">➔</span>
           </button>
           <button id="btn-start-keyboard" class="btn-secondary-flat">
-            Play with Keyboard & Mouse Only
+            Play with Keyboard / Touch Controls
           </button>
         </div>
       </div>

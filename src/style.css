@@ -1,4 +1,4 @@
-/* AeroWing 3D - Modern Flight Cockpit Styling */
+/* AeroWing 3D - Modern Flight Cockpit Styling (Universal Responsive) */
 :root {
   --font-main: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
@@ -11,10 +11,16 @@
   --color-accent: #ff4757;
   --color-success: #00ff88;
 
-  --glass-bg: rgba(13, 25, 41, 0.65);
-  --glass-border: rgba(255, 255, 255, 0.12);
+  --glass-bg: rgba(13, 25, 41, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.14);
   --glass-blur: blur(14px);
-  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+
+  /* Device Safe Area Insets for Notch / Dynamic Island / Android Nav Bar */
+  --sat: env(safe-area-inset-top, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
 }
 
 *, *::before, *::after {
@@ -22,15 +28,19 @@
   margin: 0;
   padding: 0;
   user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 html, body {
   width: 100%;
   height: 100%;
+  height: 100dvh;
   overflow: hidden;
   background-color: var(--color-bg);
   font-family: var(--font-main);
   color: #ffffff;
+  touch-action: none;
 }
 
 /* Three.js Canvas */
@@ -72,42 +82,52 @@ html, body {
   border-radius: 14px;
 }
 
-/* Top Navigation & Score Bar */
+/* ==========================================================================
+   TOP NAVIGATION & SCORE BAR (Adaptive Layout)
+   ========================================================================== */
 .hud-topbar {
   position: absolute;
-  top: 20px;
+  top: max(14px, var(--sat));
   left: 50%;
   transform: translateX(-50%);
   display: flex;
   align-items: center;
-  gap: 1.5rem;
+  justify-content: center;
+  gap: clamp(0.5rem, 1.8vw, 1.5rem);
+  width: auto;
+  max-width: calc(100vw - 24px);
   z-index: 10;
   pointer-events: none;
+  transition: all 0.3s ease;
 }
 
 .hud-widget {
   background: var(--glass-bg);
   backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow);
   border-radius: 12px;
-  padding: 0.6rem 1.2rem;
+  padding: clamp(0.35rem, 0.9vw, 0.6rem) clamp(0.5rem, 1.2vw, 1.2rem);
   display: flex;
   flex-direction: column;
   align-items: center;
+  flex-shrink: 1;
+  min-width: 0;
 }
 
 .widget-label {
-  font-size: 0.65rem;
+  font-size: clamp(0.52rem, 1.1vw, 0.65rem);
   font-weight: 700;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.1em;
   color: #7d9cb8;
-  margin-bottom: 0.25rem;
+  margin-bottom: 0.2rem;
+  white-space: nowrap;
 }
 
 .progress-bar-container {
-  width: 140px;
-  height: 6px;
+  width: clamp(65px, 12vw, 140px);
+  height: clamp(4px, 0.8vw, 6px);
   background: rgba(255, 255, 255, 0.12);
   border-radius: 4px;
   overflow: hidden;
@@ -124,40 +144,41 @@ html, body {
 
 .widget-value-sm {
   font-family: var(--font-mono);
-  font-size: 0.8rem;
+  font-size: clamp(0.68rem, 1.3vw, 0.8rem);
   font-weight: 600;
   color: #d1e7ff;
+  white-space: nowrap;
 }
 
 /* Compass Radar Needle */
 .compass-widget {
-  min-width: 90px;
+  min-width: clamp(65px, 9vw, 90px);
 }
 
 .compass-dial {
   position: relative;
-  width: 44px;
-  height: 44px;
+  width: clamp(34px, 4.5vw, 44px);
+  height: clamp(34px, 4.5vw, 44px);
   border-radius: 50%;
   border: 1.5px solid rgba(0, 240, 255, 0.4);
   background: radial-gradient(circle, rgba(0, 240, 255, 0.08) 0%, transparent 70%);
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 0.2rem;
+  margin-bottom: 0.15rem;
 }
 
 .compass-north {
   position: absolute;
   top: 1px;
-  font-size: 0.55rem;
+  font-size: clamp(0.48rem, 1vw, 0.55rem);
   font-weight: 800;
   color: var(--color-primary);
 }
 
 .compass-needle {
   width: 3px;
-  height: 28px;
+  height: clamp(20px, 3vw, 28px);
   position: relative;
   transition: transform 0.1s linear;
 }
@@ -177,30 +198,32 @@ html, body {
 
 /* Score & Timer */
 .score-widget {
-  min-width: 130px;
+  min-width: clamp(80px, 12vw, 130px);
 }
 
 .timer-display {
   font-family: var(--font-mono);
-  font-size: 0.75rem;
+  font-size: clamp(0.65rem, 1.2vw, 0.75rem);
   color: #8bb3db;
   letter-spacing: 0.08em;
 }
 
 .score-display {
   font-family: var(--font-mono);
-  font-size: 1.4rem;
+  font-size: clamp(1rem, 2.2vw, 1.4rem);
   font-weight: 700;
   color: #ffd700;
   text-shadow: 0 0 12px var(--color-gold-glow);
+  line-height: 1.1;
 }
 
 .combo-badge {
-  font-size: 0.7rem;
+  font-size: clamp(0.58rem, 1.1vw, 0.7rem);
   font-weight: 800;
   color: #00ff88;
   letter-spacing: 0.06em;
   animation: pulseCombo 0.8s infinite alternate;
+  white-space: nowrap;
 }
 
 @keyframes pulseCombo {
@@ -208,42 +231,45 @@ html, body {
   to { transform: scale(1.08); }
 }
 
-/* Cockpit Gauges (Bottom Left) */
+/* ==========================================================================
+   COCKPIT GAUGES (Adaptive Position: Bottom Left on Desktop, Top Left on Mobile)
+   ========================================================================== */
 .hud-gauges-left {
   position: absolute;
-  bottom: 28px;
-  left: 28px;
+  bottom: max(24px, var(--sab));
+  left: max(24px, var(--sal));
   display: flex;
-  gap: 1rem;
+  gap: 0.8rem;
   z-index: 10;
   pointer-events: none;
+  transition: all 0.3s ease;
 }
 
 .instrument-card {
-  padding: 0.8rem 1.2rem;
-  min-width: 140px;
+  padding: clamp(0.5rem, 1vw, 0.8rem) clamp(0.7rem, 1.3vw, 1.2rem);
+  min-width: clamp(100px, 12vw, 140px);
 }
 
 .instrument-header {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  font-size: 0.65rem;
+  gap: 0.35rem;
+  font-size: clamp(0.55rem, 1vw, 0.65rem);
   font-weight: 700;
   letter-spacing: 0.1em;
   color: #85a4c5;
-  margin-bottom: 0.3rem;
+  margin-bottom: 0.2rem;
 }
 
 .instrument-body {
   display: flex;
   align-items: baseline;
-  gap: 0.4rem;
+  gap: 0.35rem;
 }
 
 .instrument-value {
   font-family: var(--font-mono);
-  font-size: 1.9rem;
+  font-size: clamp(1.3rem, 2.4vw, 1.9rem);
   font-weight: 700;
   line-height: 1;
   color: #ffffff;
@@ -251,42 +277,46 @@ html, body {
 }
 
 .instrument-unit {
-  font-size: 0.75rem;
+  font-size: clamp(0.6rem, 1vw, 0.75rem);
   font-weight: 600;
   color: #85a4c5;
 }
 
 .dive-hint {
-  font-size: 0.6rem;
+  font-size: 0.58rem;
   font-weight: 600;
   letter-spacing: 0.05em;
   color: #557596;
-  margin-top: 0.3rem;
+  margin-top: 0.25rem;
 }
 
-/* Center Notifications */
+/* ==========================================================================
+   CENTER SCREEN NOTIFICATIONS
+   ========================================================================== */
 .hud-notification {
   position: absolute;
-  top: 25%;
+  top: 24%;
   left: 50%;
   transform: translate(-50%, -50%) scale(0.8);
   font-family: var(--font-main);
-  font-size: 2rem;
+  font-size: clamp(1.1rem, 3.2vw, 1.9rem);
   font-weight: 800;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   pointer-events: none;
   opacity: 0;
   transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   z-index: 20;
   text-align: center;
-  padding: 0.6rem 2rem;
+  padding: 0.5rem 1.6rem;
   border-radius: 24px;
+  max-width: 90vw;
+  white-space: nowrap;
 }
 
 .hud-notification.visible {
   opacity: 1;
-  transform: translate(-50%, -50%) scale(1.05);
+  transform: translate(-50%, -50%) scale(1.02);
 }
 
 .hud-notification.flap,
@@ -311,80 +341,93 @@ html, body {
   box-shadow: 0 0 30px rgba(0, 255, 136, 0.6);
 }
 
-/* Bottom Bar Status & Action Buttons */
+/* ==========================================================================
+   BOTTOM BAR & ACTION BUTTONS
+   ========================================================================== */
 .hud-bottombar {
   position: absolute;
-  bottom: 28px;
+  bottom: max(16px, var(--sab));
   left: 50%;
   transform: translateX(-50%);
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 0.8rem;
   z-index: 15;
+  max-width: calc(100vw - 32px);
+  transition: all 0.3s ease;
 }
 
 .hud-status-badge {
-  padding: 0.55rem 1.1rem;
-  font-size: 0.8rem;
+  padding: 0.45rem 0.9rem;
+  font-size: clamp(0.68rem, 1.2vw, 0.78rem);
   font-weight: 600;
   color: #a0c2e4;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.03em;
   white-space: nowrap;
+  max-width: 420px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .hud-action-buttons {
   display: flex;
-  gap: 0.6rem;
+  align-items: center;
+  gap: clamp(0.35rem, 1vw, 0.6rem);
 }
 
 .btn-hud {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.55rem 1rem;
-  background: rgba(18, 32, 53, 0.7);
+  justify-content: center;
+  gap: 0.4rem;
+  padding: clamp(0.45rem, 1vw, 0.55rem) clamp(0.65rem, 1.3vw, 1rem);
+  background: rgba(18, 32, 53, 0.75);
   backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border: 1px solid var(--glass-border);
   border-radius: 12px;
   color: #d1e7ff;
   font-family: var(--font-main);
-  font-size: 0.8rem;
+  font-size: clamp(0.72rem, 1.2vw, 0.82rem);
   font-weight: 600;
   cursor: pointer;
+  white-space: nowrap;
   transition: all 0.2s ease;
 }
 
-.btn-hud:hover {
-  background: rgba(30, 52, 85, 0.85);
+.btn-hud:hover, .btn-hud:active {
+  background: rgba(30, 52, 85, 0.88);
   border-color: var(--color-primary);
   color: #ffffff;
   transform: translateY(-2px);
   box-shadow: 0 4px 16px var(--color-primary-glow);
 }
 
-/* Picture-In-Picture Webcam HUD (Bottom Right) */
+/* ==========================================================================
+   PICTURE-IN-PICTURE WEBCAM HUD (Bottom Right)
+   ========================================================================== */
 .pip-webcam-container {
   position: absolute;
-  bottom: 28px;
-  right: 28px;
-  width: 280px;
+  bottom: max(20px, var(--sab));
+  right: max(20px, var(--sar));
+  width: clamp(160px, 20vw, 270px);
   z-index: 25;
   overflow: hidden;
-  transition: transform 0.3s ease, height 0.3s ease;
+  transition: transform 0.3s ease, width 0.3s ease, bottom 0.3s ease, right 0.3s ease;
 }
 
 .pip-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.5rem 0.8rem;
-  background: rgba(5, 12, 22, 0.85);
+  padding: 0.4rem 0.7rem;
+  background: rgba(5, 12, 22, 0.88);
   border-bottom: 1px solid var(--glass-border);
 }
 
 .pip-indicator.live {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   background-color: #00ff88;
   box-shadow: 0 0 8px #00ff88;
@@ -397,9 +440,9 @@ html, body {
 }
 
 .pip-title {
-  font-size: 0.7rem;
+  font-size: clamp(0.58rem, 1vw, 0.68rem);
   font-weight: 700;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   color: #79a1c8;
 }
 
@@ -409,6 +452,7 @@ html, body {
   color: #79a1c8;
   cursor: pointer;
   font-size: 0.9rem;
+  padding: 0 4px;
 }
 
 .pip-viewport {
@@ -420,7 +464,7 @@ html, body {
 }
 
 #webcam-video {
-  display: none; /* Processed onto canvas */
+  display: none;
 }
 
 #webcam-overlay {
@@ -433,28 +477,165 @@ html, body {
 .pip-controls-guide {
   display: flex;
   justify-content: space-around;
-  padding: 0.45rem;
-  background: rgba(5, 12, 22, 0.8);
-  font-size: 0.68rem;
+  padding: 0.35rem 0.5rem;
+  background: rgba(5, 12, 22, 0.85);
+  font-size: clamp(0.58rem, 0.9vw, 0.65rem);
   font-weight: 600;
   color: #9ac2eb;
 }
 
-/* Modals & Menus */
-.game-modal-backdrop {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(3, 8, 16, 0.82);
-  backdrop-filter: blur(16px);
+/* ==========================================================================
+   TOUCH CONTROLS LAYER (On-screen Virtual Flight Controls for Mobile/Tablet)
+   ========================================================================== */
+.touch-controls-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 18;
+  display: none; /* Shown dynamically on touch devices or touch mode */
+}
+
+.touch-controls-layer.active {
+  display: block;
+}
+
+/* Left Side: Virtual Steering Thumbstick */
+.touch-stick-zone {
+  position: absolute;
+  bottom: max(20px, var(--sab));
+  left: max(20px, var(--sal));
+  width: 130px;
+  height: 130px;
+  pointer-events: auto;
+  touch-action: none;
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.touch-stick-base {
+  position: relative;
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(0, 240, 255, 0.08) 0%, rgba(10, 22, 38, 0.7) 100%);
+  border: 2px solid rgba(0, 240, 255, 0.35);
+  box-shadow: 0 0 20px rgba(0, 240, 255, 0.15), inset 0 0 15px rgba(0, 240, 255, 0.1);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.touch-stick-knob {
+  position: absolute;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(0, 240, 255, 0.85) 0%, rgba(0, 150, 255, 0.9) 100%);
+  box-shadow: 0 0 18px rgba(0, 240, 255, 0.6);
+  border: 2px solid #ffffff;
+  pointer-events: none;
+  transform: translate(0px, 0px);
+  transition: transform 0.06s ease-out;
+}
+
+.stick-hint {
+  position: absolute;
+  bottom: -22px;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: rgba(0, 240, 255, 0.7);
+  white-space: nowrap;
+}
+
+/* Right Side: Circular Action Buttons */
+.touch-actions-zone {
+  position: absolute;
+  bottom: max(20px, var(--sab));
+  right: max(20px, var(--sar));
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  pointer-events: auto;
+}
+
+.btn-touch-circle {
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+  touch-action: none;
+  transition: transform 0.1s ease, box-shadow 0.15s ease, filter 0.15s ease;
+  user-select: none;
+}
+
+.btn-touch-circle:active {
+  transform: scale(0.92);
+  filter: brightness(1.25);
+}
+
+.btn-touch-flap {
+  width: 76px;
+  height: 76px;
+  background: linear-gradient(135deg, #00b4ff 0%, #00f0ff 100%);
+  box-shadow: 0 0 25px rgba(0, 240, 255, 0.55), inset 0 0 10px rgba(255, 255, 255, 0.5);
+  border: 2px solid #ffffff;
+  color: #04101d;
+}
+
+.btn-touch-brake {
+  width: 56px;
+  height: 56px;
+  background: linear-gradient(135deg, #ff4757 0%, #ff6b81 100%);
+  box-shadow: 0 0 18px rgba(255, 71, 87, 0.45);
+  border: 2px solid rgba(255, 255, 255, 0.7);
+  color: #ffffff;
+}
+
+.touch-btn-icon {
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+.btn-touch-brake .touch-btn-icon {
+  font-size: 1.1rem;
+}
+
+.touch-btn-text {
+  font-family: var(--font-main);
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  margin-top: 2px;
+}
+
+/* ==========================================================================
+   MODALS & MENUS (Universal Scrollable & Landscape Ready)
+   ========================================================================== */
+.game-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  height: 100dvh;
+  background: rgba(3, 8, 16, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(16px, var(--sat)) max(16px, var(--sar)) max(16px, var(--sab)) max(16px, var(--sal));
   z-index: 100;
   opacity: 0;
   pointer-events: none;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   transition: opacity 0.35s ease;
 }
 
@@ -464,60 +645,84 @@ html, body {
 }
 
 .glass-panel-modal {
-  background: rgba(14, 25, 42, 0.92);
+  background: rgba(14, 25, 42, 0.94);
   backdrop-filter: blur(24px);
-  border: 1px solid rgba(0, 240, 255, 0.25);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(0, 240, 255, 0.28);
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7), 0 0 30px rgba(0, 240, 255, 0.15);
-  border-radius: 22px;
-  padding: 2.5rem;
+  border-radius: clamp(16px, 2.5vw, 24px);
+  padding: clamp(1.2rem, 3.5vw, 2.5rem);
   max-width: 680px;
-  width: 90%;
+  width: min(680px, 94vw);
+  max-height: min(90vh, 90dvh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   text-align: center;
+  margin: auto;
+}
+
+/* Sleek modal scrollbar */
+.glass-panel-modal::-webkit-scrollbar {
+  width: 6px;
+}
+.glass-panel-modal::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+}
+.glass-panel-modal::-webkit-scrollbar-thumb {
+  background: rgba(0, 240, 255, 0.35);
+  border-radius: 4px;
+}
+.glass-panel-modal::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 240, 255, 0.6);
 }
 
 .modal-badge {
   display: inline-block;
-  padding: 0.3rem 0.9rem;
+  padding: 0.25rem 0.8rem;
   background: rgba(0, 240, 255, 0.15);
   border: 1px solid rgba(0, 240, 255, 0.4);
   border-radius: 20px;
-  font-size: 0.7rem;
+  font-size: clamp(0.62rem, 1vw, 0.7rem);
   font-weight: 800;
   letter-spacing: 0.14em;
   color: var(--color-primary);
-  margin-bottom: 0.8rem;
+  margin-bottom: 0.6rem;
 }
 
 .modal-title {
-  font-size: 2.6rem;
+  font-size: clamp(1.8rem, 4.5vw, 2.6rem);
   font-weight: 800;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.03em;
   color: #ffffff;
-  margin-bottom: 0.4rem;
+  margin-bottom: 0.3rem;
   background: linear-gradient(135deg, #ffffff 40%, #00f0ff 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
+  line-height: 1.15;
 }
 
 .modal-title-sm {
-  font-size: 1.8rem;
+  font-size: clamp(1.3rem, 3vw, 1.8rem);
   font-weight: 700;
-  margin-bottom: 1.2rem;
+  margin-bottom: 0.8rem;
   color: #d8ecff;
+  line-height: 1.2;
 }
 
 .modal-subtitle {
-  font-size: 1.05rem;
+  font-size: clamp(0.85rem, 1.5vw, 1.05rem);
   color: #92b7dd;
-  margin-bottom: 2rem;
+  margin-bottom: clamp(1.2rem, 2.5vw, 2rem);
+  line-height: 1.4;
 }
 
-/* Instructions Grid */
+/* Instructions Grid (Fluid Auto-Fit) */
 .instructions-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 1.2rem;
-  margin-bottom: 2rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: clamp(0.8rem, 1.8vw, 1.2rem);
+  margin-bottom: clamp(1.2rem, 2.5vw, 2rem);
   text-align: left;
 }
 
@@ -525,41 +730,41 @@ html, body {
   background: rgba(22, 38, 62, 0.55);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 14px;
-  padding: 1.2rem;
+  padding: clamp(0.8rem, 1.6vw, 1.2rem);
   transition: transform 0.2s ease, border-color 0.2s ease;
 }
 
 .instruction-card:hover {
-  transform: translateY(-3px);
+  transform: translateY(-2px);
   border-color: rgba(0, 240, 255, 0.4);
 }
 
 .instruction-icon {
-  font-size: 2rem;
-  margin-bottom: 0.4rem;
-}
-
-.instruction-card h3 {
-  font-size: 1.05rem;
-  font-weight: 700;
-  color: #e5f2ff;
+  font-size: clamp(1.5rem, 2.5vw, 2rem);
   margin-bottom: 0.3rem;
 }
 
+.instruction-card h3 {
+  font-size: clamp(0.9rem, 1.5vw, 1.05rem);
+  font-weight: 700;
+  color: #e5f2ff;
+  margin-bottom: 0.25rem;
+}
+
 .instruction-card p {
-  font-size: 0.82rem;
+  font-size: clamp(0.75rem, 1.2vw, 0.82rem);
   color: #8daecf;
   line-height: 1.45;
 }
 
 kbd {
   display: inline-block;
-  padding: 0.15rem 0.4rem;
-  background: rgba(0, 0, 0, 0.4);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 0.15rem 0.35rem;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.25);
   border-radius: 5px;
   font-family: var(--font-mono);
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   color: #ffdf22;
 }
 
@@ -567,21 +772,21 @@ kbd {
 .modal-actions {
   display: flex;
   flex-direction: column;
-  gap: 0.8rem;
+  gap: 0.7rem;
 }
 
 .btn-primary-glow {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.8rem;
-  padding: 1rem 2rem;
+  gap: 0.7rem;
+  padding: clamp(0.75rem, 1.8vw, 1rem) clamp(1.2rem, 3vw, 2rem);
   background: linear-gradient(135deg, #0099ff 0%, #00f0ff 100%);
   border: none;
   border-radius: 14px;
   color: #04101d;
   font-family: var(--font-main);
-  font-size: 1rem;
+  font-size: clamp(0.85rem, 1.5vw, 1rem);
   font-weight: 800;
   letter-spacing: 0.05em;
   cursor: pointer;
@@ -589,25 +794,25 @@ kbd {
   transition: all 0.25s ease;
 }
 
-.btn-primary-glow:hover {
+.btn-primary-glow:hover, .btn-primary-glow:active {
   transform: translateY(-2px);
   box-shadow: 0 0 35px rgba(0, 240, 255, 0.7);
   filter: brightness(1.1);
 }
 
 .btn-secondary-flat {
-  padding: 0.7rem;
+  padding: 0.6rem;
   background: none;
   border: none;
   color: #79a0c7;
   font-family: var(--font-main);
-  font-size: 0.85rem;
+  font-size: clamp(0.78rem, 1.3vw, 0.88rem);
   font-weight: 600;
   cursor: pointer;
   transition: color 0.2s ease;
 }
 
-.btn-secondary-flat:hover {
+.btn-secondary-flat:hover, .btn-secondary-flat:active {
   color: #ffffff;
   text-decoration: underline;
 }
@@ -616,21 +821,23 @@ kbd {
 .mechanics-list {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 0.8rem;
   text-align: left;
 }
 
 .mechanic-item {
   display: flex;
-  gap: 1rem;
+  gap: 0.9rem;
   align-items: center;
   background: rgba(22, 38, 62, 0.55);
   border-radius: 12px;
-  padding: 0.9rem;
+  padding: clamp(0.7rem, 1.4vw, 0.9rem);
+  font-size: clamp(0.78rem, 1.3vw, 0.88rem);
 }
 
 .m-icon {
-  font-size: 1.8rem;
+  font-size: clamp(1.4rem, 2.5vw, 1.8rem);
+  flex-shrink: 0;
 }
 
 /* Victory Screen Stats */
@@ -639,8 +846,8 @@ kbd {
 }
 
 .victory-crown {
-  font-size: 4rem;
-  margin-bottom: 0.5rem;
+  font-size: clamp(2.8rem, 6vw, 4rem);
+  margin-bottom: 0.4rem;
   animation: bounceCrown 1s infinite alternate;
 }
 
@@ -652,7 +859,7 @@ kbd {
 .stats-row {
   display: flex;
   justify-content: space-around;
-  margin: 1.8rem 0;
+  margin: clamp(1.2rem, 2.5vw, 1.8rem) 0;
 }
 
 .stat-box {
@@ -662,36 +869,19 @@ kbd {
 }
 
 .stat-label {
-  font-size: 0.7rem;
+  font-size: clamp(0.62rem, 1vw, 0.7rem);
   font-weight: 700;
   letter-spacing: 0.12em;
   color: #7d9cb8;
-  margin-bottom: 0.3rem;
+  margin-bottom: 0.25rem;
 }
 
 .stat-num {
   font-family: var(--font-mono);
-  font-size: 2.2rem;
+  font-size: clamp(1.5rem, 3.5vw, 2.2rem);
   font-weight: 800;
   color: #ffd700;
   text-shadow: 0 0 15px var(--color-gold-glow);
-}
-
-/* Responsive adjustments */
-@media (max-width: 768px) {
-  .instructions-grid {
-    grid-template-columns: 1fr;
-  }
-  .hud-gauges-left {
-    bottom: 100px;
-    left: 14px;
-    flex-direction: column;
-  }
-  .pip-webcam-container {
-    width: 180px;
-    bottom: 14px;
-    right: 14px;
-  }
 }
 
 /* ==========================================================================
@@ -699,28 +889,28 @@ kbd {
    ========================================================================== */
 .calibration-card {
   max-width: 640px;
-  width: 92%;
-  padding: 2.2rem;
-  border: 1px solid rgba(0, 240, 255, 0.25);
+  width: min(640px, 94vw);
+  padding: clamp(1.2rem, 3vw, 2.2rem);
+  border: 1px solid rgba(0, 240, 255, 0.28);
   box-shadow: 0 0 50px rgba(0, 240, 255, 0.15), inset 0 0 30px rgba(0, 240, 255, 0.05);
 }
 
 .calibration-checklist {
   display: flex;
   flex-direction: column;
-  gap: 0.9rem;
-  margin: 1.5rem 0 1.2rem;
+  gap: clamp(0.5rem, 1.2vw, 0.85rem);
+  margin: 1.2rem 0 1rem;
   text-align: left;
 }
 
 .calib-item {
   display: flex;
   align-items: center;
-  gap: 1.1rem;
+  gap: clamp(0.6rem, 1.5vw, 1.1rem);
   background: rgba(14, 28, 48, 0.65);
   border: 1px solid rgba(50, 90, 140, 0.4);
   border-radius: 14px;
-  padding: 1rem 1.2rem;
+  padding: clamp(0.7rem, 1.4vw, 1rem) clamp(0.8rem, 1.8vw, 1.2rem);
   transition: all 0.3s ease;
   position: relative;
 }
@@ -729,7 +919,6 @@ kbd {
   background: rgba(18, 40, 70, 0.85);
   border-color: var(--color-primary);
   box-shadow: 0 0 20px rgba(0, 240, 255, 0.2);
-  transform: scale(1.01);
 }
 
 .calib-item.complete {
@@ -739,9 +928,9 @@ kbd {
 }
 
 .calib-icon-box {
-  font-size: 1.8rem;
-  width: 44px;
-  height: 44px;
+  font-size: clamp(1.3rem, 2.2vw, 1.8rem);
+  width: clamp(36px, 4.5vw, 44px);
+  height: clamp(36px, 4.5vw, 44px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -752,29 +941,31 @@ kbd {
 
 .calib-info {
   flex: 1;
+  min-width: 0;
 }
 
 .calib-title {
-  font-size: 0.95rem;
+  font-size: clamp(0.82rem, 1.4vw, 0.95rem);
   font-weight: 700;
   color: #e5f2ff;
-  margin-bottom: 0.2rem;
+  margin-bottom: 0.15rem;
 }
 
 .calib-desc {
-  font-size: 0.76rem;
+  font-size: clamp(0.68rem, 1.1vw, 0.76rem);
   color: #7fa4ca;
 }
 
 .calib-badge {
   font-family: var(--font-mono);
-  font-size: 0.72rem;
+  font-size: clamp(0.65rem, 1.1vw, 0.72rem);
   font-weight: 700;
-  padding: 0.35rem 0.75rem;
+  padding: 0.3rem 0.65rem;
   border-radius: 20px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .calib-badge.pending {
@@ -806,11 +997,11 @@ kbd {
 /* Horizontal Hold Progress Bar */
 .calib-progress-track {
   width: 100%;
-  height: 6px;
+  height: 5px;
   background: rgba(255, 255, 255, 0.1);
   border-radius: 4px;
   overflow: hidden;
-  margin-top: 0.5rem;
+  margin-top: 0.4rem;
 }
 
 .calib-progress-bar {
@@ -824,15 +1015,16 @@ kbd {
 /* Subcheck Badges for Roll Left & Right */
 .calib-subchecks {
   display: flex;
-  gap: 0.6rem;
-  margin-top: 0.45rem;
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+  flex-wrap: wrap;
 }
 
 .subcheck-badge {
   font-family: var(--font-mono);
-  font-size: 0.7rem;
+  font-size: clamp(0.62rem, 1vw, 0.7rem);
   font-weight: 600;
-  padding: 0.2rem 0.6rem;
+  padding: 0.18rem 0.5rem;
   border-radius: 6px;
   background: rgba(20, 36, 60, 0.8);
   border: 1px solid rgba(60, 100, 150, 0.4);
@@ -851,20 +1043,20 @@ kbd {
 .calib-feedback-box {
   display: flex;
   align-items: center;
-  gap: 0.8rem;
-  background: rgba(7, 18, 32, 0.85);
+  gap: 0.7rem;
+  background: rgba(7, 18, 32, 0.88);
   border: 1px solid rgba(0, 240, 255, 0.3);
   border-radius: 12px;
-  padding: 0.85rem 1.1rem;
-  font-size: 0.82rem;
+  padding: 0.7rem 1rem;
+  font-size: clamp(0.72rem, 1.2vw, 0.82rem);
   font-weight: 500;
   color: #b0d8ff;
   text-align: left;
 }
 
 .feedback-pulse {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   background: #00f0ff;
   box-shadow: 0 0 10px #00f0ff;
@@ -881,17 +1073,17 @@ kbd {
 .calib-footer {
   display: flex;
   justify-content: flex-end;
-  margin-top: 1.4rem;
+  margin-top: 1.1rem;
 }
 
 .btn-skip-glow {
   background: rgba(25, 45, 75, 0.7);
   border: 1px solid rgba(100, 145, 200, 0.4);
   color: #9ac2eb;
-  padding: 0.75rem 1.4rem;
+  padding: 0.65rem 1.2rem;
   border-radius: 10px;
   font-family: var(--font-main);
-  font-size: 0.85rem;
+  font-size: clamp(0.75rem, 1.2vw, 0.85rem);
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -900,7 +1092,7 @@ kbd {
   gap: 0.5rem;
 }
 
-.btn-skip-glow:hover {
+.btn-skip-glow:hover, .btn-skip-glow:active {
   background: rgba(0, 240, 255, 0.18);
   border-color: #00f0ff;
   color: #ffffff;
@@ -913,8 +1105,7 @@ kbd {
    ========================================================================== */
 .countdown-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
+  inset: 0;
   width: 100%;
   height: 100%;
   background: radial-gradient(circle, rgba(0, 30, 60, 0.7) 0%, rgba(2, 6, 12, 0.9) 100%);
@@ -934,7 +1125,7 @@ kbd {
 
 .countdown-number {
   font-family: var(--font-main);
-  font-size: 7rem;
+  font-size: clamp(4rem, 15vw, 7rem);
   font-weight: 900;
   color: #ffffff;
   text-shadow: 0 0 40px var(--color-primary), 0 0 80px rgba(0, 240, 255, 0.5);
@@ -948,3 +1139,340 @@ kbd {
   opacity: 1;
 }
 
+/* ==========================================================================
+   FINE-TUNED RESPONSIVE BREAKPOINTS (Mobile, Tablet, Desktop, Landscape)
+   ========================================================================== */
+
+/* Laptop / Medium screens (<= 1200px): Prevent bottom gauge & PiP overlap */
+@media (max-width: 1200px) {
+  .hud-gauges-left {
+    bottom: auto;
+    top: calc(max(14px, var(--sat)) + 68px);
+    left: max(14px, var(--sal));
+    flex-direction: column;
+    gap: 6px;
+  }
+  .instrument-card {
+    min-width: 110px;
+    padding: 0.45rem 0.8rem;
+  }
+  .dive-hint {
+    display: none;
+  }
+  .pip-webcam-container {
+    width: 200px;
+  }
+}
+
+/* Tablet & Phablet (<= 900px) */
+@media (max-width: 900px) {
+  .hud-bottombar {
+    flex-direction: column-reverse;
+    gap: 6px;
+    bottom: max(10px, var(--sab));
+  }
+  .hud-status-badge {
+    padding: 0.3rem 0.7rem;
+    font-size: 0.7rem;
+    background: rgba(10, 20, 35, 0.8);
+  }
+  .pip-webcam-container {
+    width: 160px;
+    bottom: max(12px, var(--sab));
+    right: max(12px, var(--sar));
+  }
+}
+
+/* Mobile Portrait & Small Screens (<= 640px) */
+@media (max-width: 640px) {
+  .hud-topbar {
+    top: max(8px, var(--sat));
+    gap: 0.35rem;
+    max-width: calc(100vw - 12px);
+  }
+  .hud-widget {
+    padding: 0.3rem 0.5rem;
+  }
+  .progress-bar-container {
+    width: 55px;
+  }
+  .widget-label {
+    font-size: 0.5rem;
+    letter-spacing: 0.05em;
+  }
+  .widget-value-sm {
+    font-size: 0.65rem;
+  }
+
+  /* Compact Instruments top-left */
+  .hud-gauges-left {
+    top: calc(max(8px, var(--sat)) + 56px);
+    left: max(8px, var(--sal));
+    gap: 4px;
+  }
+  .instrument-card {
+    min-width: 85px;
+    padding: 0.3rem 0.55rem;
+    border-radius: 8px;
+  }
+  .instrument-header {
+    font-size: 0.52rem;
+    margin-bottom: 0.1rem;
+  }
+  .instrument-value {
+    font-size: 1.15rem;
+  }
+  .instrument-unit {
+    font-size: 0.55rem;
+  }
+
+  /* Compact Bottom Action Bar */
+  .hud-bottombar {
+    max-width: calc(100vw - 16px);
+    bottom: max(8px, var(--sab));
+  }
+  .hud-action-buttons {
+    gap: 0.35rem;
+  }
+  .btn-hud {
+    padding: 0.4rem 0.6rem;
+    border-radius: 9px;
+  }
+  .btn-hud .btn-icon {
+    font-size: 0.95rem;
+  }
+
+  /* Webcam PiP on small mobile: move to top-right to keep bottom clear for touch */
+  .pip-webcam-container {
+    width: 130px;
+    top: calc(max(8px, var(--sat)) + 56px);
+    bottom: auto;
+    right: max(8px, var(--sar));
+    border-radius: 10px;
+  }
+  .pip-controls-guide {
+    display: none;
+  }
+
+  /* Touch buttons sized for thumb reach */
+  .touch-stick-zone {
+    width: 110px;
+    height: 110px;
+    bottom: max(12px, var(--sab));
+    left: max(10px, var(--sal));
+  }
+  .touch-stick-base {
+    width: 95px;
+    height: 95px;
+  }
+  .touch-stick-knob {
+    width: 42px;
+    height: 42px;
+  }
+  .touch-actions-zone {
+    bottom: max(12px, var(--sab));
+    right: max(10px, var(--sar));
+    gap: 10px;
+  }
+  .btn-touch-flap {
+    width: 66px;
+    height: 66px;
+  }
+  .btn-touch-brake {
+    width: 48px;
+    height: 48px;
+  }
+
+  /* Modals on Mobile Portrait */
+  .glass-panel-modal {
+    padding: 1.2rem 1rem;
+    width: 95vw;
+    border-radius: 16px;
+  }
+  .instructions-grid {
+    grid-template-columns: 1fr;
+    gap: 0.6rem;
+    margin-bottom: 1.2rem;
+  }
+  .instruction-card {
+    padding: 0.75rem;
+  }
+}
+
+/* Ultra Small / Foldable Outer Screens (<= 380px) */
+@media (max-width: 380px) {
+  .hud-action-buttons .btn-text {
+    display: none; /* Icon-only button on ultra small screen */
+  }
+  .btn-hud {
+    padding: 0.4rem 0.55rem;
+  }
+  .hud-status-badge {
+    display: none; /* Hide verbose status badge to save precious space */
+  }
+}
+
+/* ==========================================================================
+   MOBILE LANDSCAPE VIEWPORTS (Short height <= 550px)
+   ========================================================================== */
+@media (max-height: 550px) {
+  /* Modals in landscape: compact padding & horizontal economy */
+  .glass-panel-modal {
+    padding: 0.9rem 1.4rem;
+    max-height: 92dvh;
+    border-radius: 14px;
+  }
+  .modal-badge {
+    margin-bottom: 0.25rem;
+    padding: 0.15rem 0.6rem;
+    font-size: 0.6rem;
+  }
+  .modal-title {
+    font-size: 1.4rem;
+    margin-bottom: 0.15rem;
+  }
+  .modal-title-sm {
+    font-size: 1.15rem;
+    margin-bottom: 0.35rem;
+  }
+  .modal-subtitle {
+    font-size: 0.75rem;
+    margin-bottom: 0.7rem;
+  }
+  .instructions-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.45rem;
+    margin-bottom: 0.8rem;
+  }
+  .instruction-card {
+    padding: 0.5rem 0.65rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+  .instruction-icon {
+    font-size: 1.2rem;
+    margin-bottom: 0;
+  }
+  .instruction-card h3 {
+    font-size: 0.78rem;
+    margin-bottom: 0.1rem;
+  }
+  .instruction-card p {
+    font-size: 0.68rem;
+    line-height: 1.2;
+  }
+  .btn-primary-glow {
+    padding: 0.55rem 1.2rem;
+    font-size: 0.82rem;
+    border-radius: 10px;
+  }
+  .btn-secondary-flat {
+    padding: 0.3rem;
+    font-size: 0.75rem;
+  }
+
+  /* Calibration in Landscape */
+  .calibration-card {
+    padding: 0.8rem 1.4rem;
+  }
+  .calibration-checklist {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.45rem;
+    margin: 0.6rem 0;
+  }
+  .calib-item {
+    padding: 0.45rem 0.65rem;
+    gap: 0.5rem;
+  }
+  .calib-icon-box {
+    width: 28px;
+    height: 28px;
+    font-size: 1.1rem;
+  }
+  .calib-title {
+    font-size: 0.75rem;
+  }
+  .calib-desc {
+    display: none; /* Hide descriptions to conserve height in landscape */
+  }
+  .calib-badge {
+    font-size: 0.6rem;
+    padding: 0.2rem 0.45rem;
+  }
+  .calib-feedback-box {
+    padding: 0.4rem 0.7rem;
+    font-size: 0.72rem;
+  }
+  .calib-footer {
+    margin-top: 0.5rem;
+  }
+
+  /* In-game HUD in Landscape */
+  .hud-topbar {
+    top: max(4px, var(--sat));
+    gap: 0.4rem;
+  }
+  .hud-widget {
+    padding: 0.25rem 0.6rem;
+  }
+  .compass-dial {
+    width: 28px;
+    height: 28px;
+  }
+  .compass-needle {
+    height: 18px;
+  }
+  .score-display {
+    font-size: 1rem;
+  }
+  .hud-gauges-left {
+    top: auto;
+    bottom: max(10px, var(--sab));
+    left: max(10px, var(--sal));
+    flex-direction: row;
+    gap: 6px;
+  }
+  .hud-bottombar {
+    bottom: max(6px, var(--sab));
+  }
+  .hud-status-badge {
+    display: none; /* Conserve vertical space in landscape */
+  }
+  .pip-webcam-container {
+    width: 140px;
+    top: max(4px, var(--sat));
+    bottom: auto;
+    right: max(6px, var(--sar));
+  }
+
+  /* Touch controls in landscape: stick on far left, actions on far right */
+  .touch-stick-zone {
+    width: 95px;
+    height: 95px;
+    bottom: max(8px, var(--sab));
+    left: max(12px, var(--sal));
+  }
+  .touch-stick-base {
+    width: 85px;
+    height: 85px;
+  }
+  .touch-stick-knob {
+    width: 36px;
+    height: 36px;
+  }
+  .touch-actions-zone {
+    bottom: max(8px, var(--sab));
+    right: max(12px, var(--sar));
+    gap: 10px;
+  }
+  .btn-touch-flap {
+    width: 58px;
+    height: 58px;
+  }
+  .btn-touch-brake {
+    width: 44px;
+    height: 44px;
+  }
+}

@@ -40,6 +40,17 @@ class Game {
   };
   private prevPos = new THREE.Vector3();
 
+  // Touch / Mobile Input states
+  private isTouchDevice = false;
+  private touchState = {
+    roll: 0,
+    pitch: 0,
+    flap: false,
+    brake: false
+  };
+  private touchControlsEl: HTMLElement;
+  private touchStickKnobEl: HTMLElement;
+
   // Screen Wake Lock & Milestones
   private wakeLock: any = null;
   private lastMilestoneDistance = 0;
@@ -50,6 +61,12 @@ class Game {
   constructor() {
     this.canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
     this.speedLinesEl = document.getElementById('speed-lines-overlay')!;
+    this.touchControlsEl = document.getElementById('touch-controls-layer')!;
+    this.touchStickKnobEl = document.getElementById('touch-stick-knob')!;
+    this.isTouchDevice = Boolean('ontouchstart' in window || (navigator.maxTouchPoints && navigator.maxTouchPoints > 0));
+    if (this.isTouchDevice) {
+      document.body.classList.add('has-touch');
+    }
 
     // 1. Scene & Renderer
     this.scene = new THREE.Scene();
@@ -94,6 +111,7 @@ class Game {
     // Event Listeners
     this.setupWindowListeners();
     this.setupKeyboardListeners();
+    this.setupTouchListeners();
     this.setupUIButtons();
   }
 
@@ -116,14 +134,22 @@ class Game {
   }
 
   private setupWindowListeners(): void {
-    window.addEventListener('resize', () => {
+    const handleResize = () => {
       const width = window.innerWidth;
       const height = window.innerHeight;
       this.camera.aspect = width / height;
       this.camera.updateProjectionMatrix();
       this.renderer.setSize(width, height);
       this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+    };
+
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('orientationchange', () => {
+      setTimeout(handleResize, 150);
     });
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleResize);
+    }
 
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible' && (this.isRunning || this.inCalibration)) {
@@ -167,6 +193,117 @@ class Game {
     });
   }
 
+  private setupTouchListeners(): void {
+    const stickZone = document.getElementById('touch-stick-zone');
+    const stickBase = document.getElementById('touch-stick-base');
+    const btnFlap = document.getElementById('btn-touch-flap');
+    const btnBrake = document.getElementById('btn-touch-brake');
+
+    if (!stickZone || !stickBase || !btnFlap || !btnBrake) return;
+
+    let touchId: number | null = null;
+    let baseRect: DOMRect | null = null;
+    const maxRadius = 38;
+
+    const onStickMove = (clientX: number, clientY: number) => {
+      if (!baseRect) baseRect = stickBase.getBoundingClientRect();
+      const centerX = baseRect.left + baseRect.width / 2;
+      const centerY = baseRect.top + baseRect.height / 2;
+
+      let dx = clientX - centerX;
+      let dy = clientY - centerY;
+      const dist = Math.hypot(dx, dy);
+
+      if (dist > maxRadius) {
+        dx = (dx / dist) * maxRadius;
+        dy = (dy / dist) * maxRadius;
+      }
+
+      this.touchStickKnobEl.style.transform = `translate(${dx}px, ${dy}px)`;
+
+      // Normalized roll: left (-1) to right (+1)
+      this.touchState.roll = dx / maxRadius;
+      // Normalized pitch: pulling down (positive dy) pitches nose UP (+0.85), pushing up dives nose DOWN (-0.85)
+      this.touchState.pitch = -dy / maxRadius;
+    };
+
+    const onStickEnd = () => {
+      touchId = null;
+      baseRect = null;
+      this.touchStickKnobEl.style.transform = 'translate(0px, 0px)';
+      this.touchState.roll = 0;
+      this.touchState.pitch = 0;
+    };
+
+    stickZone.addEventListener('touchstart', (e: TouchEvent) => {
+      e.preventDefault();
+      if (touchId === null && e.changedTouches.length > 0) {
+        const touch = e.changedTouches[0];
+        touchId = touch.identifier;
+        baseRect = stickBase.getBoundingClientRect();
+        onStickMove(touch.clientX, touch.clientY);
+      }
+    }, { passive: false });
+
+    stickZone.addEventListener('touchmove', (e: TouchEvent) => {
+      e.preventDefault();
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const touch = e.changedTouches[i];
+        if (touch.identifier === touchId) {
+          onStickMove(touch.clientX, touch.clientY);
+          break;
+        }
+      }
+    }, { passive: false });
+
+    stickZone.addEventListener('touchend', (e: TouchEvent) => {
+      e.preventDefault();
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        if (e.changedTouches[i].identifier === touchId) {
+          onStickEnd();
+          break;
+        }
+      }
+    }, { passive: false });
+
+    stickZone.addEventListener('touchcancel', () => {
+      onStickEnd();
+    });
+
+    // Flap Button
+    btnFlap.addEventListener('touchstart', (e: TouchEvent) => {
+      e.preventDefault();
+      this.touchState.flap = true;
+      this.audio.playClapBoom();
+      this.bird.triggerClapBurst();
+      this.hud.showNotification('⚡ FLAP BOOST! ⚡', 'clap');
+    }, { passive: false });
+
+    btnFlap.addEventListener('touchend', (e: TouchEvent) => {
+      e.preventDefault();
+      this.touchState.flap = false;
+    }, { passive: false });
+
+    btnFlap.addEventListener('touchcancel', () => {
+      this.touchState.flap = false;
+    });
+
+    // Brake Button
+    btnBrake.addEventListener('touchstart', (e: TouchEvent) => {
+      e.preventDefault();
+      this.touchState.brake = true;
+    }, { passive: false });
+
+    btnBrake.addEventListener('touchend', (e: TouchEvent) => {
+      e.preventDefault();
+      this.touchState.brake = false;
+    }, { passive: false });
+
+    btnBrake.addEventListener('touchcancel', () => {
+      this.touchState.brake = false;
+    });
+  }
+
   private setupUIButtons(): void {
     // Start with Camera & Pre-Flight Check
     const btnStart = document.getElementById('btn-start-game')!;
@@ -174,10 +311,13 @@ class Game {
       this.audio.init();
       document.getElementById('welcome-modal')!.classList.remove('visible');
       this.controlMode = 'camera';
+      if (this.isTouchDevice) {
+        this.touchControlsEl.classList.add('active');
+      }
       this.startCalibrationFlow();
     });
 
-    // Start with Keyboard Only
+    // Start with Keyboard / Touch Controls
     const btnKeyboard = document.getElementById('btn-start-keyboard')!;
     btnKeyboard.addEventListener('click', () => {
       this.audio.init();
@@ -186,7 +326,8 @@ class Game {
       this.isRunning = true;
       this.controlMode = 'keyboard';
       document.getElementById('pip-webcam-container')!.style.display = 'none';
-      this.hud.showNotification('🦅 FLIGHT STARTED! (KEYBOARD MODE)', 'boost');
+      this.touchControlsEl.classList.add('active');
+      this.hud.showNotification('🦅 FLIGHT STARTED! (TOUCH & KEYS ACTIVE)', 'boost');
     });
 
     // Toggle Camera
@@ -194,12 +335,16 @@ class Game {
     btnToggleCam.addEventListener('click', async () => {
       if (this.controlMode === 'camera') {
         this.controlMode = 'keyboard';
-        document.getElementById('btn-camera-text')!.textContent = 'Keyboard Only';
+        document.getElementById('btn-camera-text')!.textContent = 'Keys/Touch';
         document.getElementById('pip-webcam-container')!.style.display = 'none';
+        this.touchControlsEl.classList.add('active');
       } else {
         this.controlMode = 'camera';
-        document.getElementById('btn-camera-text')!.textContent = 'Camera Motion';
+        document.getElementById('btn-camera-text')!.textContent = 'Camera';
         document.getElementById('pip-webcam-container')!.style.display = 'block';
+        if (!this.isTouchDevice) {
+          this.touchControlsEl.classList.remove('active');
+        }
         await this.motionTracker.start();
       }
     });
@@ -408,6 +553,9 @@ class Game {
         this.hud.resetTimer();
         this.isRunning = true;
         this.countdownActive = false;
+        if (this.isTouchDevice || this.controlMode === 'keyboard') {
+          this.touchControlsEl.classList.add('active');
+        }
         this.hud.showNotification('🦅 TERBANG! KEPATKAN SAYAP UNTUK NAIK!', 'boost');
       }
     };
@@ -518,7 +666,7 @@ class Game {
         flapIntensity = 1.0;
       }
     } else {
-      // Keyboard only
+      // Keyboard & Touch mode
       if (this.keyState.left) rollInput = -1.0;   // Turn Left
       if (this.keyState.right) rollInput = 1.0;   // Turn Right
       if (this.keyState.down) pitchInput = -0.85; // Dive Down!
@@ -526,7 +674,25 @@ class Game {
       isFlapping = this.keyState.space;
       isBraking = this.keyState.brake;
       flapIntensity = isFlapping ? 1.0 : 0;
-      trackingStatus = 'Keyboard Mode (Space=Flap, B/Shift=Brake, A/D=Turn, S/W=Down/Up)';
+      trackingStatus = this.isTouchDevice
+        ? 'Touch Controls (Stick=Steer/Pitch, 🪽=Flap, 🛑=Brake)'
+        : 'Keyboard Mode (Space=Flap, B/Shift=Brake, A/D=Turn, S/W=Down/Up)';
+    }
+
+    // Touch controls input blend / override
+    if (Math.abs(this.touchState.roll) > 0.05) {
+      rollInput = this.touchState.roll;
+      rollAngleRad = undefined;
+    }
+    if (Math.abs(this.touchState.pitch) > 0.05) {
+      pitchInput = this.touchState.pitch * 0.85;
+    }
+    if (this.touchState.flap) {
+      isFlapping = true;
+      flapIntensity = 1.0;
+    }
+    if (this.touchState.brake) {
+      isBraking = true;
     }
 
     const flightInput: FlightInput = {
