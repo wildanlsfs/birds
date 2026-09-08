@@ -59,6 +59,7 @@ class Game {
   // Screen Wake Lock & Milestones
   private wakeLock: any = null;
   private lastMilestoneDistance = 0;
+  private totalDistanceTraveled = 0;
 
   // Speed lines overlay
   private speedLinesEl: HTMLElement;
@@ -690,6 +691,7 @@ class Game {
     this.hud.setFeathers(0);
     this.hud.setBirdBadge(BIRD_PROFILES[this.currentBirdType].name, BIRD_PROFILES[this.currentBirdType].icon);
     this.lastMilestoneDistance = 0;
+    this.totalDistanceTraveled = 0;
 
     // 5. Hide modals if any
     document.getElementById('welcome-modal')?.classList.remove('visible');
@@ -841,6 +843,13 @@ class Game {
       this.hud.showNotification('🪶 +150 BULU EMAS!', 'feather');
     }
 
+    // Calculate true 360-degree distance traveled
+    const stepDist = this.physics.position.distanceTo(this.prevPos);
+    if (stepDist < 100) {
+      this.totalDistanceTraveled += stepDist;
+    }
+    const distanceTraveled = Math.round(this.totalDistanceTraveled);
+
     // 4.5 Check Terrain & Island Collision (prevents penetrating ground, handles fatal crash)
     const terrainHit = this.world.checkTerrainCollision(this.physics.position);
     if (terrainHit.hasCollision) {
@@ -852,7 +861,7 @@ class Game {
         this.cameraShakeTime = 0.85;
         this.cameraShakeIntensity = 2.4;
         const profile = BIRD_PROFILES[this.currentBirdType];
-        const dist = Math.max(0, Math.round(-this.physics.position.z));
+        const dist = distanceTraveled;
         this.hud.showGameOver(
           terrainHit.reason,
           dist,
@@ -882,7 +891,6 @@ class Game {
     }
 
     // Distance Milestone Celebrations (every 1000m)
-    const distanceTraveled = Math.max(0, Math.round(-this.physics.position.z));
     if (distanceTraveled >= this.lastMilestoneDistance + 1000) {
       this.lastMilestoneDistance = Math.floor(distanceTraveled / 1000) * 1000;
       this.audio.playVictoryFanfare();
@@ -905,9 +913,9 @@ class Game {
       }
     );
 
-    // Procedural Endless World & Waypoints Update
+    // Procedural Endless World & Waypoints Update in 360 degrees
     this.world.update(delta, this.physics.position);
-    this.waypoints.update(delta);
+    this.waypoints.update(delta, this.physics.position, this.physics.yaw);
 
     // 7. Dynamic Camera Follow
     this.updateCamera(delta);
@@ -922,15 +930,19 @@ class Game {
       this.speedLinesEl.classList.remove('active');
     }
 
-    // 10. Update HUD & Compass
+    // 10. Update HUD & Compass (Accurate 360° relative bearing)
     let compassAngle = 0;
     const currentTarget = this.waypoints.getCurrentTarget();
     if (currentTarget) {
       const dx = currentTarget.x - this.physics.position.x;
       const dz = currentTarget.z - this.physics.position.z;
-      const targetBearing = Math.atan2(dx, dz);
-      // Relative to bird's heading (yaw)
-      compassAngle = targetBearing - this.physics.yaw;
+      const fwdX = -Math.sin(this.physics.yaw);
+      const fwdZ = -Math.cos(this.physics.yaw);
+      const rightX = Math.cos(this.physics.yaw);
+      const rightZ = -Math.sin(this.physics.yaw);
+      const dotFwd = dx * fwdX + dz * fwdZ;
+      const dotRight = dx * rightX + dz * rightZ;
+      compassAngle = Math.atan2(dotRight, dotFwd);
     }
 
     this.hud.update({

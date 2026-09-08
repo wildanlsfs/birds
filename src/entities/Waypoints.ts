@@ -1,9 +1,11 @@
 import * as THREE from 'three';
 import { FlightPhysics } from '../systems/FlightPhysics';
+import { World } from './World';
 
 export interface RingData {
   index: number;
   position: THREE.Vector3;
+  forward: THREE.Vector3;
   rotation: THREE.Euler;
   radius: number;
   isBoost: boolean;
@@ -12,9 +14,10 @@ export interface RingData {
 }
 
 /**
- * Endless Waypoint Manager:
- * Procedural infinite ring generation with magnetic slipstream assistance,
- * smooth sweeping roller-coaster paths, dynamic boost rings, and combo multipliers.
+ * Endless 360° Waypoint Manager:
+ * Procedural infinite ring generation supporting free flight in any direction (360°).
+ * Dynamically orients rings to face flight trajectories, maintains magnetic slipstream assistance,
+ * adapts courses if player explores elsewhere, and provides dynamic boost rings & combo multipliers.
  */
 export class WaypointManager {
   public scene: THREE.Scene;
@@ -24,7 +27,8 @@ export class WaypointManager {
   public collectedCount = 0;
 
   private ringsSpawned = 0;
-  private lastSpawnZ = -30;
+  private lastRingPos = new THREE.Vector3(0, 24, 10);
+  private courseHeading = 0; // heading angle in radians (0 = towards -Z)
   private readonly visibleRings = 8;
   private readonly ringRadius = 8.5; // Welcoming 8.5m radius for motion play
 
@@ -45,7 +49,7 @@ export class WaypointManager {
 
     this.burstParticles = this.createBurstParticles();
 
-    // Spawn initial set of 8 rings
+    // Spawn initial set of 8 rings starting ahead of the runway
     for (let i = 0; i < this.visibleRings; i++) {
       this.spawnNextRing();
     }
@@ -95,22 +99,35 @@ export class WaypointManager {
   /**
    * Spawns the next procedural ring ahead along a smooth scenic sky curve
    */
-  public spawnNextRing(): void {
+  public spawnNextRing(desiredHeading?: number): void {
     const t = this.ringsSpawned;
     this.ringsSpawned++;
 
-    // Procedural wave flight trajectory
-    const deltaZ = 85 + Math.sin(t * 0.4) * 15;
-    this.lastSpawnZ -= deltaZ;
+    if (desiredHeading !== undefined) {
+      let diff = desiredHeading - this.courseHeading;
+      while (diff > Math.PI) diff -= Math.PI * 2;
+      while (diff < -Math.PI) diff += Math.PI * 2;
+      this.courseHeading += diff * 0.45;
+    } else {
+      // Gentle scenic sweeping curves
+      this.courseHeading += Math.sin(t * 0.45) * 0.22;
+    }
 
-    const posX = Math.sin(t * 0.45) * 45 + Math.cos(t * 0.22) * 20;
-    const posY = 26 + Math.sin(t * 0.6) * 16;
-    const pos = new THREE.Vector3(posX, posY, this.lastSpawnZ);
+    const stepDist = 80 + Math.sin(t * 0.3) * 12;
+    const nextX = this.lastRingPos.x - Math.sin(this.courseHeading) * stepDist;
+    const nextZ = this.lastRingPos.z - Math.cos(this.courseHeading) * stepDist;
+    const groundY = World.getGroundHeight(nextX, nextZ);
+    const nextY = Math.max(groundY + 18, 22 + Math.sin(t * 0.5) * 12);
+    const pos = new THREE.Vector3(nextX, nextY, nextZ);
+
+    const forward = new THREE.Vector3().subVectors(pos, this.lastRingPos).normalize();
+    if (forward.lengthSq() < 0.001) forward.set(0, 0, -1);
 
     const isBoost = t > 0 && t % 5 === 0; // Every 5th ring is a Turbo Boost ring
 
     const ringGroup = new THREE.Group();
     ringGroup.position.copy(pos);
+    ringGroup.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), forward);
 
     // Torus geometry
     const torusGeo = new THREE.TorusGeometry(this.ringRadius, 0.55, 12, 32);
@@ -152,12 +169,43 @@ export class WaypointManager {
     this.rings.push({
       index: t,
       position: pos,
-      rotation: new THREE.Euler(),
+      forward,
+      rotation: ringGroup.rotation,
       radius: this.ringRadius,
       isBoost,
       meshGroup: ringGroup,
       pulseMesh
     });
+
+    this.lastRingPos.copy(pos);
+  }
+
+  /**
+   * Gracefully re-routes the flight course ahead of the player if they fly off-track
+   */
+  public reorientCourse(birdPos: THREE.Vector3, birdHeading: number): void {
+    for (const r of this.rings) {
+      this.scene.remove(r.meshGroup);
+      r.meshGroup.traverse((child) => {
+        if ((child as THREE.Mesh).isMesh) {
+          (child as THREE.Mesh).geometry.dispose();
+        }
+      });
+    }
+    this.rings = [];
+    this.combo = 1;
+
+    this.courseHeading = birdHeading;
+    this.lastRingPos.set(
+      birdPos.x + Math.sin(birdHeading) * 15,
+      birdPos.y,
+      birdPos.z + Math.cos(birdHeading) * 15
+    );
+
+    for (let i = 0; i < this.visibleRings; i++) {
+      this.spawnNextRing(birdHeading);
+    }
+    this.updateActiveRingVisuals();
   }
 
   public updateActiveRingVisuals(): void {
@@ -177,7 +225,7 @@ export class WaypointManager {
   }
 
   /**
-   * Check ring pass-through with magnetic slipstream assist
+   * Check ring pass-through with magnetic slipstream assist in 360 degrees
    */
   public checkPassThrough(
     prevPos: THREE.Vector3,
@@ -191,6 +239,7 @@ export class WaypointManager {
 
     const activeRing = this.rings[0];
     const ringPos = activeRing.position;
+    const ringFwd = activeRing.forward;
 
     // Apply Magnetic Slipstream Assist towards active ring
     if (physics) {
@@ -198,11 +247,17 @@ export class WaypointManager {
     }
 
     const distToCenter = currPos.distanceTo(ringPos);
-    const passedZ = (prevPos.z > ringPos.z && currPos.z <= ringPos.z) || (prevPos.z < ringPos.z && currPos.z >= ringPos.z);
+
+    // Plane crossing check in 3D
+    const toPrev = new THREE.Vector3().subVectors(prevPos, ringPos);
+    const toCurr = new THREE.Vector3().subVectors(currPos, ringPos);
+    const dotPrev = toPrev.dot(ringFwd);
+    const dotCurr = toCurr.dot(ringFwd);
+    const passedPlane = (dotPrev <= 0 && dotCurr >= 0) || (dotPrev >= 0 && dotCurr <= 0);
     const closeEnough = distToCenter < activeRing.radius * 1.5;
 
     // 1. RING COLLECTED
-    if (distToCenter < activeRing.radius || (passedZ && closeEnough)) {
+    if (distToCenter < activeRing.radius || (passedPlane && closeEnough)) {
       this.triggerCollectionBurst(ringPos, activeRing.isBoost);
 
       this.totalScore += 250 * this.combo;
@@ -221,8 +276,8 @@ export class WaypointManager {
       return { hit: true, isBoost: wasBoost };
     }
 
-    // 2. MISSED RING (Bird flew > 28m past the ring without collecting)
-    if (currPos.z < ringPos.z - 28) {
+    // 2. MISSED RING (Bird flew > 28m past the ring along its heading, or wandered > 180m away)
+    if (dotCurr > 28 || distToCenter > 180) {
       this.combo = 1; // Reset combo multiplier
       this.removeRing(0);
       this.spawnNextRing();
@@ -236,6 +291,11 @@ export class WaypointManager {
     if (index >= 0 && index < this.rings.length) {
       const ring = this.rings.splice(index, 1)[0];
       this.scene.remove(ring.meshGroup);
+      ring.meshGroup.traverse((child) => {
+        if ((child as THREE.Mesh).isMesh) {
+          (child as THREE.Mesh).geometry.dispose();
+        }
+      });
     }
   }
 
@@ -272,7 +332,7 @@ export class WaypointManager {
     return null;
   }
 
-  public update(delta: number): void {
+  public update(delta: number, birdPos?: THREE.Vector3, birdHeading?: number): void {
     // Pulse and rotate rings
     const time = performance.now() * 0.003;
     this.rings.forEach((r, idx) => {
@@ -280,6 +340,14 @@ export class WaypointManager {
       const scale = 0.9 + Math.sin(time + idx) * 0.15;
       r.pulseMesh.scale.set(scale, scale, 1);
     });
+
+    // Check if player has completely wandered off the ring track (> 220m away)
+    if (birdPos && this.rings.length > 0) {
+      const distToActive = birdPos.distanceTo(this.rings[0].position);
+      if (distToActive > 220) {
+        this.reorientCourse(birdPos, birdHeading ?? this.courseHeading);
+      }
+    }
 
     // Update burst particles
     const posAttr = this.burstParticles.geometry.attributes.position as THREE.BufferAttribute;
@@ -308,11 +376,17 @@ export class WaypointManager {
   public reset(): void {
     for (const r of this.rings) {
       this.scene.remove(r.meshGroup);
+      r.meshGroup.traverse((child) => {
+        if ((child as THREE.Mesh).isMesh) {
+          (child as THREE.Mesh).geometry.dispose();
+        }
+      });
     }
     this.rings = [];
     this.collectedCount = 0;
     this.ringsSpawned = 0;
-    this.lastSpawnZ = -30;
+    this.lastRingPos.set(0, 24, 10);
+    this.courseHeading = 0;
     this.combo = 1;
     this.totalScore = 0;
 
@@ -326,7 +400,7 @@ export class WaypointManager {
     posAttr.needsUpdate = true;
 
     // Respawn initial rings ahead
-    for (let i = 0; i < 12; i++) {
+    for (let i = 0; i < this.visibleRings; i++) {
       this.spawnNextRing();
     }
     this.updateActiveRingVisuals();
