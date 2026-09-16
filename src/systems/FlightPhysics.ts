@@ -73,8 +73,6 @@ export class FlightPhysics {
     if (input.isBraking) {
       // Decelerate forward speed rapidly down to minSpeed
       this.forwardSpeed = THREE.MathUtils.lerp(this.forwardSpeed, this.minSpeed, dt * 4.5);
-      // Gentle flare lift
-      this.verticalImpulse = Math.min(8.0, this.verticalImpulse + 5.0 * dt);
     }
 
     // Decay wing flap impulse
@@ -123,17 +121,17 @@ export class FlightPhysics {
     // 4. Airspeed dynamics:
     // Diving accelerates speed naturally with gravity (from cruise speed up to max dive)
     if (this.pitch < 0) {
-      const diveAccel = -Math.sin(this.pitch) * 9.5;
+      const diveAccel = -Math.sin(this.pitch) * 11.0;
       this.forwardSpeed = THREE.MathUtils.clamp(this.forwardSpeed + diveAccel * dt, this.cruiseSpeed, this.maxSpeed);
     } else if (!input.isBraking) {
-      // Climbing nose up bleeds off excess speed
-      const climbDrag = Math.sin(this.pitch) * this.gravity * 1.5;
+      // Climbing nose up bleeds off excess speed naturally
+      const climbDrag = Math.sin(this.pitch) * this.gravity * 1.6;
       this.forwardSpeed -= climbDrag * dt;
     }
 
-    // Drag gently pulls back towards cruise speed if cruising level
+    // Aerodynamic drag bleeds excess dive speed back to cruise speed smoothly
     if (!input.isBraking && this.pitch >= -0.05 && this.forwardSpeed > this.cruiseSpeed && this.boostTimer <= 0) {
-      this.forwardSpeed -= 0.65 * (this.forwardSpeed - this.cruiseSpeed) * dt;
+      this.forwardSpeed -= 1.8 * (this.forwardSpeed - this.cruiseSpeed) * dt;
     } else if (!input.isBraking && this.forwardSpeed < this.cruiseSpeed) {
       // Return to cruise speed
       this.forwardSpeed = Math.min(this.cruiseSpeed, this.forwardSpeed + 3.0 * dt);
@@ -141,34 +139,33 @@ export class FlightPhysics {
 
     this.forwardSpeed = THREE.MathUtils.clamp(this.forwardSpeed, this.minSpeed, this.maxSpeed);
 
-    // 5. 3D Flight Direction Vector (6-DOF) with Realistic Aerodynamic Glide
+    // 5. 3D Flight Direction Vector with Continuous Gravity & Natural Glide Descent
     const dirX = -Math.sin(this.yaw) * Math.cos(this.pitch);
     const dirZ = -Math.cos(this.yaw) * Math.cos(this.pitch);
 
-    // Aerodynamic Glide Lift & Gravity:
-    const speedRatio = this.forwardSpeed / this.cruiseSpeed;
-    let dynamicLift = Math.min(1.4, speedRatio * speedRatio) * this.gravity * this.glideEfficiency;
+    // Continuous natural gliding sink rate:
+    // An unpowered gliding bird ALWAYS gently sinks under gravity (-1.3 to -2.0 m/s depending on species).
+    // Flapping (verticalImpulse) or thermals (updraft) are required to climb or sustain altitude!
+    const baseSinkRate = -1.65 / Math.max(0.65, this.glideEfficiency);
 
-    if (this.pitch < 0) {
-      // Lowering arms / nose down cuts lift by up to 88%
-      const sinkIntensity = Math.min(1.0, -this.pitch / 0.35);
-      dynamicLift *= (1.0 - sinkIntensity * 0.88);
+    // Pitch guidance: nose angle directly directs the flight vector
+    // Dive (pitch < 0): steep downward velocity (-5 to -16 m/s)
+    // Climb (pitch > 0): upward velocity, converting forward speed into height
+    const pitchVelY = Math.sin(this.pitch) * this.forwardSpeed;
+
+    // Zoom-climb bonus from high airspeed ONLY when player actively points nose up (pitch > 0.05)
+    let speedZoomClimb = 0;
+    if (this.pitch > 0.05 && this.forwardSpeed > this.cruiseSpeed) {
+      const excessSpeedRatio = (this.forwardSpeed - this.cruiseSpeed) / this.cruiseSpeed;
+      speedZoomClimb = excessSpeedRatio * Math.sin(this.pitch) * 9.0;
     }
 
-    const gravityForce = -this.gravity;
-    // Net vertical acceleration from wing lift vs gravity
-    const aeroVerticalAcc = (dynamicLift + gravityForce) * 0.75;
+    // Target vertical velocity combining pitch steering, constant gravity sink, and flap impulse
+    const targetVelY = pitchVelY + baseSinkRate + speedZoomClimb + this.verticalImpulse;
 
-    // Pitch guidance: nose angle directs the path of flight
-    const targetNoseVelY = Math.sin(this.pitch) * this.forwardSpeed;
-
-    // Total vertical target velocity combining pitch steering, aerodynamic lift, and flap lift
-    const targetVelY = targetNoseVelY + aeroVerticalAcc + this.verticalImpulse;
-
-    // Smooth vertical damping with inertia:
-    // Diving gives solid downward velocity (-6 to -14 m/s)
+    // Smooth vertical damping with natural aerodynamic inertia
     this.velocity.y = THREE.MathUtils.damp(this.velocity.y, targetVelY, 4.5, dt);
-    this.velocity.y = THREE.MathUtils.clamp(this.velocity.y, -16.0, 22.0);
+    this.velocity.y = THREE.MathUtils.clamp(this.velocity.y, -18.0, 22.0);
 
     this.velocity.x = dirX * this.forwardSpeed;
     this.velocity.z = dirZ * this.forwardSpeed;
@@ -178,13 +175,13 @@ export class FlightPhysics {
     this.position.y += this.velocity.y * dt;
     this.position.z += this.velocity.z * dt;
 
-    // Safe floor (cloud sea boundary) and ceiling bounds
-    if (this.position.y < 4.0) {
-      this.position.y = 4.0;
-      this.velocity.y = Math.max(4.0, this.velocity.y);
+    // Absolute bounds (subterranean void floor and sky ceiling)
+    if (this.position.y < -40.0) {
+      this.position.y = -40.0;
+      this.velocity.y = Math.max(0, this.velocity.y);
     }
-    if (this.position.y > 190) {
-      this.position.y = 190;
+    if (this.position.y > 220) {
+      this.position.y = 220;
       this.velocity.y = Math.min(0, this.velocity.y);
     }
   }

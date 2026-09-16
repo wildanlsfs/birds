@@ -529,6 +529,17 @@ export class MotionTracker {
                 });
           }
 
+          // Keep steering active and level out pitch during flap stroke
+          const angleDiff = (this.rightArmAngle - this.leftArmAngle);
+          let targetRoll = 0;
+          if (Math.abs(angleDiff) > 12) {
+            targetRoll = Math.sign(angleDiff) * ((Math.abs(angleDiff) - 12) / 38);
+          }
+          this.smoothedRoll = THREE.MathUtils.lerp(this.smoothedRoll, THREE.MathUtils.clamp(targetRoll, -1.0, 1.0), 0.2);
+          this.smoothedPitch = THREE.MathUtils.lerp(this.smoothedPitch, 0.05, 0.25);
+          this.motionData.rollInput = this.smoothedRoll;
+          this.motionData.pitchInput = this.smoothedPitch;
+
           this.motionData.debugGesture = `🪽 FLAP NAIK (Daya: ${Math.round((this.motionData.flapIntensity || 1.0) * 100)}%)`;
       }
         // CONDITION 3: TILT & AIRBRAKE MODE
@@ -555,18 +566,18 @@ export class MotionTracker {
           let targetPitch = 0;
               if (isAirbraking) {
                         // Airbrake / Flare: pitch up gently and brake forward speed
-                targetPitch = +((Math.abs(avgAngle) - 14) / 22);
+                targetPitch = +((Math.abs(avgAngle) - 14) / 22 * 0.45);
                         this.motionData.debugGesture = '🛑 AIRBRAKE / MENGEREM';
               } else if (avgAngle < -4) {
                         // Gentle Climb Up when arms are raised slightly (-4° to -14°) WITHOUT airbraking!
                 targetPitch = THREE.MathUtils.clamp((Math.abs(avgAngle) - 4) / 10 * 0.45, 0, 0.45);
                         this.motionData.debugGesture = '↗️ NAIK / CLIMB';
-              } else if (avgAngle > 14) {
-                        // Gentle Sink Down when arms are lowered slightly (14° to 28°)
-                targetPitch = -THREE.MathUtils.clamp((avgAngle - 14) / 14 * 0.45, 0, 0.45);
+              } else if (avgAngle > 10) {
+                        // Gentle Sink Down when arms are lowered slightly (10° to 25°)
+                targetPitch = -THREE.MathUtils.clamp((avgAngle - 10) / 15 * 0.45, 0, 0.45);
                         this.motionData.debugGesture = '↘️ TURUN / SINK';
               }
-              this.smoothedPitch = THREE.MathUtils.lerp(this.smoothedPitch, THREE.MathUtils.clamp(targetPitch, -1.0, 1.0), 0.2);
+              this.smoothedPitch = THREE.MathUtils.lerp(this.smoothedPitch, THREE.MathUtils.clamp(targetPitch, -1.0, 1.0), 0.25);
               this.motionData.pitchInput = this.smoothedPitch;
 
           if (!isAirbraking) {

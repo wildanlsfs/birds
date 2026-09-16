@@ -410,18 +410,29 @@ export class BirdMesh {
 
     if (cameraMotion && cameraMotion.isCameraMode) {
       // 1. Direct Arm-Tracking Kinematics
-      const targetLeftWingAngle = cameraMotion.leftAngleRad;
-      const targetRightWingAngle = cameraMotion.rightAngleRad;
+      // Coordinate orientation in 3D (camera behind bird facing -Z):
+      // - +X is Screen-Right (this.leftWingRoot in model hierarchy)
+      // - -X is Screen-Left (this.rightWingRoot in model hierarchy)
+      //
+      // In MotionTracker (mirrored webcam view):
+      // - rightAngleRad is player's right arm (Screen-Right). Positive when lowered.
+      // - leftAngleRad is player's left arm (Screen-Left). Positive when lowered.
+      //
+      // Rotation along Z-axis (Z points towards camera):
+      // - For wing extending to +X: rotation.z < 0 tilts DOWN. So target is -rightAngleRad.
+      // - For wing extending to -X: rotation.z > 0 tilts DOWN. So target is +leftAngleRad.
+      const targetScreenRightWingAngle = -cameraMotion.rightAngleRad;
+      const targetScreenLeftWingAngle = cameraMotion.leftAngleRad;
 
       this.leftWingRoot.rotation.z = THREE.MathUtils.damp(
         this.leftWingRoot.rotation.z,
-        targetLeftWingAngle,
+        targetScreenRightWingAngle,
         14.0,
         dt
       );
       this.rightWingRoot.rotation.z = THREE.MathUtils.damp(
         this.rightWingRoot.rotation.z,
-        targetRightWingAngle,
+        targetScreenLeftWingAngle,
         14.0,
         dt
       );
