@@ -266,72 +266,59 @@ export class BirdMesh {
     this.group.add(chest);
   }
 
+  /**
+   * Build one wing (root + elbow-pivoted outer segment + tip trim).
+   * `side` is +1 for the left wing, -1 for the right (mirrored) wing.
+   */
+  private buildWingSide(side: 1 | -1): { root: THREE.Group; outer: THREE.Group } {
+    const root = new THREE.Group();
+    root.position.set(side * 0.4, 0.05, -0.3);
+
+    // Inner wing bone/mesh
+    const innerGeo = new THREE.BoxGeometry(1.6, 0.08, 0.75);
+    innerGeo.translate(side * 0.8, 0, 0); // Pivot at shoulder
+    const innerMesh = new THREE.Mesh(innerGeo, this.wingMaterial);
+    innerMesh.castShadow = true;
+    root.add(innerMesh);
+
+    // Outer wing root (elbow pivot)
+    const outer = new THREE.Group();
+    outer.position.set(side * 1.6, 0, 0);
+
+    const outerGeo = new THREE.BoxGeometry(1.8, 0.06, 0.6);
+    outerGeo.translate(side * 0.9, 0, 0.05);
+    const outerMesh = new THREE.Mesh(outerGeo, this.wingMaterial);
+    outerMesh.castShadow = true;
+    outer.add(outerMesh);
+
+    // Wingtip feather trim
+    const tipGeo = new THREE.ConeGeometry(0.28, 1.0, 4);
+    tipGeo.rotateZ(side * -Math.PI / 2);
+    tipGeo.translate(side * 1.9, 0, 0.1);
+    const tipMesh = new THREE.Mesh(tipGeo, this.accentMaterial);
+    outer.add(tipMesh);
+
+    root.add(outer);
+    this.group.add(root);
+
+    return { root, outer };
+  }
+
   private buildWings(): {
     leftRoot: THREE.Group;
     rightRoot: THREE.Group;
     leftOuter: THREE.Group;
     rightOuter: THREE.Group;
   } {
-    // Left Wing Root
-    const leftRoot = new THREE.Group();
-    leftRoot.position.set(0.4, 0.05, -0.3);
+    const left = this.buildWingSide(1);
+    const right = this.buildWingSide(-1);
 
-    // Inner wing bone/mesh
-    const innerGeo = new THREE.BoxGeometry(1.6, 0.08, 0.75);
-    innerGeo.translate(0.8, 0, 0); // Pivot at shoulder
-    const leftInnerMesh = new THREE.Mesh(innerGeo, this.wingMaterial);
-    leftInnerMesh.castShadow = true;
-    leftRoot.add(leftInnerMesh);
-
-    // Left Outer Wing Root (Elbow pivot)
-    const leftOuter = new THREE.Group();
-    leftOuter.position.set(1.6, 0, 0);
-
-    const outerGeo = new THREE.BoxGeometry(1.8, 0.06, 0.6);
-    outerGeo.translate(0.9, 0, 0.05);
-    const leftOuterMesh = new THREE.Mesh(outerGeo, this.wingMaterial);
-    leftOuterMesh.castShadow = true;
-    leftOuter.add(leftOuterMesh);
-
-    // Wingtip feather trim
-    const tipGeo = new THREE.ConeGeometry(0.28, 1.0, 4);
-    tipGeo.rotateZ(-Math.PI / 2);
-    tipGeo.translate(1.9, 0, 0.1);
-    const leftTipMesh = new THREE.Mesh(tipGeo, this.accentMaterial);
-    leftOuter.add(leftTipMesh);
-
-    leftRoot.add(leftOuter);
-    this.group.add(leftRoot);
-
-    // Right Wing Root (Mirrored)
-    const rightRoot = new THREE.Group();
-    rightRoot.position.set(-0.4, 0.05, -0.3);
-
-    const rInnerGeo = new THREE.BoxGeometry(1.6, 0.08, 0.75);
-    rInnerGeo.translate(-0.8, 0, 0);
-    const rightInnerMesh = new THREE.Mesh(rInnerGeo, this.wingMaterial);
-    rightInnerMesh.castShadow = true;
-    rightRoot.add(rightInnerMesh);
-
-    const rightOuter = new THREE.Group();
-    rightOuter.position.set(-1.6, 0, 0);
-
-    const rOuterGeo = new THREE.BoxGeometry(1.8, 0.06, 0.6);
-    rOuterGeo.translate(-0.9, 0, 0.05);
-    const rightOuterMesh = new THREE.Mesh(rOuterGeo, this.wingMaterial);
-    rightOuterMesh.castShadow = true;
-    rightOuter.add(rightOuterMesh);
-
-    const rTipGeo = new THREE.ConeGeometry(0.28, 1.0, 4);
-    rTipGeo.rotateZ(Math.PI / 2);
-    rTipGeo.translate(-1.9, 0, 0.1);
-    const rightTipMesh = new THREE.Mesh(rTipGeo, this.accentMaterial);
-    rightOuter.add(rightTipMesh);
-
-    rightRoot.add(rightOuter);
-    this.group.add(rightRoot);
-
-    return { leftRoot, rightRoot, leftOuter, rightOuter };
+    return {
+      leftRoot: left.root,
+      rightRoot: right.root,
+      leftOuter: left.outer,
+      rightOuter: right.outer
+    };
   }
 
   private buildTail(): THREE.Group {

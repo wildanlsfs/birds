@@ -344,6 +344,7 @@ class Game {
         document.getElementById('btn-camera-text')!.textContent = 'Keys/Touch';
         document.getElementById('pip-webcam-container')!.style.display = 'none';
         this.touchControlsEl.classList.add('active');
+        this.motionTracker.stop();
       } else {
         this.controlMode = 'camera';
         document.getElementById('btn-camera-text')!.textContent = 'Camera';

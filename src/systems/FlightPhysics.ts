@@ -249,10 +249,18 @@ export class FlightPhysics {
     if (distSq < 324 && distSq > 2.0) {
       const dist = Math.sqrt(distSq);
       const pullFactor = THREE.MathUtils.clamp((18.0 - dist) / 18.0, 0, 1.0);
-      const lateralAttraction = 6.0 * pullFactor * dt;
+      const pullRate = 6.0 * pullFactor;
 
-      this.position.x += dx * lateralAttraction;
-      this.position.y += dy * lateralAttraction;
+      // Steer through velocity rather than teleporting position, so the assist
+      // blends with (and decays through) the normal flight damping instead of snapping.
+      const pullVelX = dx * pullRate;
+      const pullVelY = dy * pullRate;
+
+      this.velocity.x += pullVelX;
+      this.velocity.y += pullVelY;
+
+      this.position.x += pullVelX * dt;
+      this.position.y += pullVelY * dt;
     }
   }
 

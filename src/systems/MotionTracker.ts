@@ -193,6 +193,23 @@ export class MotionTracker {
   }
 
   /**
+     * Release the webcam so the browser's camera indicator turns off.
+     * Safe to call even if the camera was never started.
+     */
+  public stop(): void {
+        const stream = this.video.srcObject as MediaStream | null;
+        if (stream) {
+              stream.getTracks().forEach((track) => track.stop());
+              this.video.srcObject = null;
+        }
+
+      this.isCameraRunning = false;
+        this.motionData.trackingActive = false;
+        this.motionData.statusText = 'Camera standby';
+        this.prevLuma = null;
+  }
+
+  /**
      * Resolve model asset with browser CacheStorage for 0ms subsequent loads
      */
   private async resolveCachedModelUrl(localPath: string, cdnFallback: string): Promise<string> {
