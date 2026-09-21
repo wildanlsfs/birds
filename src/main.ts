@@ -661,6 +661,7 @@ class Game {
     this.audio.init();
 
     this.isGameOver = false;
+    this.isRunning = false; // Freeze physics/world until the countdown finishes
     this.feathersCollected = 0;
     this.cameraShakeTime = 0;
 
