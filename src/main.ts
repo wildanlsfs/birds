@@ -5,6 +5,7 @@ import { World } from './entities/World';
 import { WaypointManager } from './entities/Waypoints';
 import { FlightPhysics, FlightInput } from './systems/FlightPhysics';
 import { MotionTracker, MotionData } from './systems/MotionTracker';
+import { recordRun } from './systems/ScoreStore';
 import { HUD } from './ui/HUD';
 
 class Game {
@@ -60,6 +61,7 @@ class Game {
   private wakeLock: any = null;
   private lastMilestoneDistance = 0;
   private totalDistanceTraveled = 0;
+  private wasInStorm = false;
 
   // Speed lines overlay
   private speedLinesEl: HTMLElement;
@@ -113,6 +115,7 @@ class Game {
 
     // HUD
     this.hud = new HUD();
+    this.hud.refreshBestScores();
 
     // Event Listeners
     this.setupWindowListeners();
@@ -414,6 +417,7 @@ class Game {
 
     btnOpenHangar?.addEventListener('click', () => {
       this.audio.init();
+      this.hud.refreshBestScores();
       hangarModal.classList.add('visible');
     });
 
@@ -455,6 +459,7 @@ class Game {
     this.physics.setProfile(profile);
     this.audio.playBirdSelectSound();
     this.hud.setBirdBadge(profile.name, profile.icon);
+    this.hud.refreshBestScores();
 
     // Update active state in Welcome modal buttons
     document.querySelectorAll('.bird-card-btn').forEach((btn) => {
@@ -692,8 +697,10 @@ class Game {
     this.hud.reset();
     this.hud.setFeathers(0);
     this.hud.setBirdBadge(BIRD_PROFILES[this.currentBirdType].name, BIRD_PROFILES[this.currentBirdType].icon);
+    this.hud.refreshBestScores();
     this.lastMilestoneDistance = 0;
     this.totalDistanceTraveled = 0;
+    this.wasInStorm = false;
 
     // 5. Hide modals if any
     document.getElementById('welcome-modal')?.classList.remove('visible');
@@ -820,6 +827,8 @@ class Game {
 
     // 3. Update Flight Physics
     this.prevPos.copy(this.physics.position);
+    const wind = this.world.getWindVector(this.physics.position);
+    this.physics.setWind(wind.x, wind.z);
     this.physics.update(delta, flightInput);
     this.physics.applyTransform(this.bird.group);
 
@@ -864,12 +873,19 @@ class Game {
         this.cameraShakeIntensity = 2.4;
         const profile = BIRD_PROFILES[this.currentBirdType];
         const dist = distanceTraveled;
+        const { isNewBest, best } = recordRun(this.currentBirdType, {
+          distance: dist,
+          score: this.waypoints.totalScore,
+          rings: this.waypoints.collectedCount
+        });
         this.hud.showGameOver(
           terrainHit.reason,
           dist,
           this.waypoints.totalScore,
           this.waypoints.collectedCount,
-          profile.name
+          profile.name,
+          best.distance,
+          isNewBest
         );
         this.hud.showNotification(`💥 CRASH! ${terrainHit.reason}`, 'warning');
       } else if (!terrainHit.isFatal) {
@@ -916,8 +932,17 @@ class Game {
     );
 
     // Procedural Endless World & Waypoints Update in 360 degrees
-    this.world.update(delta, this.physics.position);
+    this.world.update(delta, this.physics.position, this.totalDistanceTraveled);
     this.waypoints.update(delta, this.physics.position, this.physics.yaw);
+
+    // Storm weather notifications on transition only
+    const inStorm = this.world.stormIntensity > 0.4;
+    if (inStorm && !this.wasInStorm) {
+      this.hud.showNotification('⛈️ STORM AHEAD! HOLD STEADY!', 'warning');
+    } else if (!inStorm && this.wasInStorm) {
+      this.hud.showNotification('☀️ SKIES CLEARING!', 'boost');
+    }
+    this.wasInStorm = inStorm;
 
     // 7. Dynamic Camera Follow
     this.updateCamera(delta);

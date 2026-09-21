@@ -1,3 +1,5 @@
+import { getBestScores } from '../systems/ScoreStore';
+
 export interface HUDState {
   speed: number;
   altitude: number;
@@ -41,6 +43,8 @@ export class HUD {
   private gameOverScoreEl: HTMLElement;
   private gameOverRingsEl: HTMLElement;
   private gameOverBirdEl: HTMLElement;
+  private gameOverBestEl: HTMLElement | null;
+  private gameOverNewBestEl: HTMLElement | null;
 
   // Optional Feathers and Bird Badge Elements
   private feathersCountEl: HTMLElement | null;
@@ -73,6 +77,8 @@ export class HUD {
     this.gameOverScoreEl = document.getElementById('game-over-score')!;
     this.gameOverRingsEl = document.getElementById('game-over-rings')!;
     this.gameOverBirdEl = document.getElementById('game-over-bird')!;
+    this.gameOverBestEl = document.getElementById('game-over-best');
+    this.gameOverNewBestEl = document.getElementById('game-over-new-best');
 
     this.feathersCountEl = document.getElementById('hud-feather-count');
     this.hudBirdBadgeEl = document.getElementById('hud-bird-badge');
@@ -148,12 +154,22 @@ export class HUD {
     }, 1300);
   }
 
-  public showGameOver(reason: string, distance: number, score: number, rings: number, birdName: string): void {
+  public showGameOver(
+    reason: string,
+    distance: number,
+    score: number,
+    rings: number,
+    birdName: string,
+    bestDistance: number,
+    isNewBest: boolean
+  ): void {
     if (this.gameOverReasonEl) this.gameOverReasonEl.textContent = reason;
     if (this.gameOverDistEl) this.gameOverDistEl.textContent = `${Math.round(distance)}m`;
     if (this.gameOverScoreEl) this.gameOverScoreEl.textContent = score.toLocaleString();
     if (this.gameOverRingsEl) this.gameOverRingsEl.textContent = `${rings}`;
     if (this.gameOverBirdEl) this.gameOverBirdEl.textContent = birdName;
+    if (this.gameOverBestEl) this.gameOverBestEl.textContent = `${Math.round(bestDistance)}m`;
+    if (this.gameOverNewBestEl) this.gameOverNewBestEl.style.display = isNewBest ? 'block' : 'none';
 
     this.gameOverModalEl?.classList.add('visible');
   }
@@ -198,5 +214,30 @@ export class HUD {
     if (this.hudBirdBadgeEl) {
       this.hudBirdBadgeEl.textContent = `${icon} ${name}`;
     }
+  }
+
+  /**
+   * Populate best-score readouts in the Welcome and Hangar modals from local storage.
+   */
+  public refreshBestScores(): void {
+    const scores = getBestScores();
+
+    document.querySelectorAll<HTMLElement>('.bird-card-btn').forEach((btn) => {
+      const type = btn.dataset.bird as 'small' | 'medium' | 'large' | undefined;
+      const bestEl = btn.querySelector<HTMLElement>('.bird-best');
+      if (!type || !bestEl) return;
+      const best = scores[type];
+      bestEl.textContent = best ? `🏆 Rekor: ${Math.round(best.distance)}m` : 'Belum ada rekor';
+    });
+
+    document.querySelectorAll<HTMLElement>('.hangar-bird-card').forEach((card) => {
+      const type = card.dataset.bird as 'small' | 'medium' | 'large' | undefined;
+      const valueEl = card.querySelector<HTMLElement>('.h-best-value');
+      if (!type || !valueEl) return;
+      const best = scores[type];
+      valueEl.textContent = best
+        ? `${Math.round(best.distance)}m • ${best.score.toLocaleString()} pts`
+        : 'Belum ada rekor';
+    });
   }
 }

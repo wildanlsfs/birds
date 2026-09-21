@@ -108,6 +108,13 @@ export class World {
   private dirLight!: THREE.DirectionalLight;
   private sky!: THREE.Mesh;
 
+  // Distance-driven weather / progressive difficulty state
+  private baseFogDensity = 0.0013;
+  private baseDirLightIntensity = 1.45;
+  public stormIntensity = 0;
+  private windAngle = 0;
+  private readonly maxWindPush = 4.0;
+
   constructor(scene: THREE.Scene) {
     this.scene = scene;
     this.islandsGroup = new THREE.Group();
@@ -221,7 +228,7 @@ export class World {
     const hemiLight = new THREE.HemisphereLight(0xcde6ff, 0x3d6b2c, 0.9);
     this.scene.add(hemiLight);
 
-    this.dirLight = new THREE.DirectionalLight(0xfff3d1, 1.45);
+    this.dirLight = new THREE.DirectionalLight(0xfff3d1, this.baseDirLightIntensity);
     this.dirLight.position.set(160, 260, -120);
     this.dirLight.castShadow = true;
     this.dirLight.shadow.mapSize.width = 1024;
@@ -241,7 +248,7 @@ export class World {
   }
 
   private setupSkyAndFog(): void {
-    this.scene.fog = new THREE.FogExp2(0xcde6fa, 0.0013);
+    this.scene.fog = new THREE.FogExp2(0xcde6fa, this.baseFogDensity);
     this.scene.background = new THREE.Color(0xb5dcff);
 
     // Atmospheric Sky Dome
@@ -977,6 +984,21 @@ export class World {
   }
 
   /**
+   * Query current lateral storm wind push at a position (pure, no side effects)
+   */
+  public getWindVector(birdPos: THREE.Vector3): THREE.Vector3 {
+    if (this.stormIntensity <= 0.001) return new THREE.Vector3(0, 0, 0);
+    const magnitude = this.maxWindPush * this.stormIntensity;
+    const gustX = Math.sin(birdPos.x * 0.01 + this.windAngle) * 0.25;
+    const gustZ = Math.cos(birdPos.z * 0.01 + this.windAngle) * 0.25;
+    return new THREE.Vector3(
+      (Math.cos(this.windAngle) + gustX) * magnitude,
+      0,
+      (Math.sin(this.windAngle) + gustZ) * magnitude
+    );
+  }
+
+  /**
    * Check collection of golden feathers
    */
   public checkFeatherCollection(birdPos: THREE.Vector3, collectionRadius: number = 4.5): boolean {
@@ -1052,7 +1074,28 @@ export class World {
    * Update world: dynamic 2D chunk streaming in all directions, sky follow,
    * cloud drift, updraft spiral animation, and feather bobbing.
    */
-  public update(delta: number, birdPos?: THREE.Vector3): void {
+  public update(delta: number, birdPos?: THREE.Vector3, distanceTraveled: number = 0): void {
+    // Storm intensity is a deterministic function of distance (sine window, not Math.random())
+    // so weather is reproducible for a given distance instead of jarring frame-to-frame randomness.
+    const rampProgress = THREE.MathUtils.clamp(distanceTraveled / 5000, 0, 1);
+    const stormWave = Math.sin(distanceTraveled * 0.00035) * 0.5 + 0.5;
+    const stormWindow = THREE.MathUtils.clamp((stormWave - 0.55) / 0.45, 0, 1);
+    this.stormIntensity = stormWindow * rampProgress;
+    this.windAngle = distanceTraveled * 0.0006;
+
+    const fog = this.scene.fog as THREE.FogExp2 | null;
+    if (fog) {
+      const maxFogDensity = this.baseFogDensity * 2.5;
+      const targetDensity = THREE.MathUtils.lerp(this.baseFogDensity, maxFogDensity, this.stormIntensity);
+      fog.density = THREE.MathUtils.damp(fog.density, targetDensity, 1.2, delta);
+    }
+
+    if (this.dirLight) {
+      const dimmedIntensity = this.baseDirLightIntensity * 0.45;
+      const targetIntensity = THREE.MathUtils.lerp(this.baseDirLightIntensity, dimmedIntensity, this.stormIntensity);
+      this.dirLight.intensity = THREE.MathUtils.damp(this.dirLight.intensity, targetIntensity, 1.2, delta);
+    }
+
     // 1. DYNAMIC 2D PROCEDURAL CHUNK STREAMING
     if (birdPos) {
       const cx = Math.floor(birdPos.x / this.chunkSize);
@@ -1152,6 +1195,12 @@ export class World {
     this.updrafts = [];
     this.updraftParticles = [];
     this.activeFeathers = [];
+
+    // Snap weather back to calm instead of relying on the damp in update() to decay it
+    this.stormIntensity = 0;
+    this.windAngle = 0;
+    (this.scene.fog as THREE.FogExp2).density = this.baseFogDensity;
+    this.dirLight.intensity = this.baseDirLightIntensity;
 
     // Pre-generate 5x5 grid around origin
     for (let dx = -this.loadRadius; dx <= this.loadRadius; dx++) {

@@ -25,6 +25,10 @@ export class FlightPhysics {
   // Wing lift vertical impulse from flapping (decays over time)
   private verticalImpulse = 0;
 
+  // Lateral storm wind push, set externally each frame via setWind()
+  private windX = 0;
+  private windZ = 0;
+
   // Physical parameters (configurable via bird profiles)
   public minSpeed = 5.0;
   public maxSpeed = 50.0;
@@ -167,8 +171,8 @@ export class FlightPhysics {
     this.velocity.y = THREE.MathUtils.damp(this.velocity.y, targetVelY, 4.5, dt);
     this.velocity.y = THREE.MathUtils.clamp(this.velocity.y, -18.0, 22.0);
 
-    this.velocity.x = dirX * this.forwardSpeed;
-    this.velocity.z = dirZ * this.forwardSpeed;
+    this.velocity.x = dirX * this.forwardSpeed + this.windX;
+    this.velocity.z = dirZ * this.forwardSpeed + this.windZ;
 
     // Integrate position
     this.position.x += this.velocity.x * dt;
@@ -218,6 +222,8 @@ export class FlightPhysics {
     this.flapTimer = 0;
     this.boostTimer = 0;
     this.inUpdraft = false;
+    this.windX = 0;
+    this.windZ = 0;
   }
 
   /**
@@ -234,6 +240,25 @@ export class FlightPhysics {
   public triggerBoost(): void {
     this.boostTimer = 2.2;
     this.forwardSpeed = Math.min(this.maxSpeed, this.forwardSpeed + 16);
+  }
+
+  /**
+   * Set current storm wind push, folded into velocity inside update().
+   * Must be called BEFORE update() each frame — update() overwrites
+   * velocity.x/z synchronously using these fields, so setting them after
+   * update() has already run silently discards the wind for that frame.
+   */
+  public setWind(x: number, z: number): void {
+    const maxWind = this.cruiseSpeed * 0.18;
+    const mag = Math.hypot(x, z);
+    if (mag > maxWind && mag > 0) {
+      const scale = maxWind / mag;
+      this.windX = x * scale;
+      this.windZ = z * scale;
+    } else {
+      this.windX = x;
+      this.windZ = z;
+    }
   }
 
   /**
