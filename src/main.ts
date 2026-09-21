@@ -62,6 +62,7 @@ class Game {
   private lastMilestoneDistance = 0;
   private totalDistanceTraveled = 0;
   private wasInStorm = false;
+  private wasTooCloseToCam = false;
 
   // Speed lines overlay
   private speedLinesEl: HTMLElement;
@@ -596,6 +597,9 @@ class Game {
       msgEl.textContent = state.statusMessage;
     }
 
+    // Too Close warning — highlight the feedback box while it blocks progress
+    document.getElementById('calib-feedback')?.classList.toggle('warning', state.tooClose);
+
     // Transition when calibration complete
     if (state.isComplete) {
       this.inCalibration = false;
@@ -763,6 +767,11 @@ class Game {
       isBraking = currentMotion.isBraking || this.keyState.brake;
       flapIntensity = currentMotion.flapIntensity;
       trackingStatus = currentMotion.statusText;
+
+      if (currentMotion.tooClose && !this.wasTooCloseToCam) {
+        this.hud.showNotification('⚠️ TERLALU DEKAT KE KAMERA! MUNDUR SEDIKIT', 'warning');
+      }
+      this.wasTooCloseToCam = currentMotion.tooClose;
 
       // Allow keyboard override / assistance in camera mode
       if (this.keyState.left) {

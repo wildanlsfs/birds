@@ -12,6 +12,7 @@ export interface CalibrationState {
   statusMessage: string;
     horizontalProgress: number; // 0 to 1
   isComplete: boolean;
+  tooClose: boolean; // Player is too close to the camera for reliable arm tracking
 }
 
 export interface MotionData {
@@ -31,6 +32,7 @@ export interface MotionData {
     trackingActive: boolean;
     statusText: string;
     debugGesture: string;       // e.g. "✈️ TILT MODE", "⬇️ MENUKIK", "🪽 FLAP NAIK"
+    tooClose: boolean;          // Shoulders/arms fill too much of the frame for reliable tracking
 }
 
 // Arm & upper torso connection indices for MediaPipe Pose
@@ -86,7 +88,8 @@ export class MotionTracker {
         currentStep: 1,
         statusMessage: 'Menunggu deteksi kamera & postur tubuh...',
         horizontalProgress: 0,
-      isComplete: false
+      isComplete: false,
+      tooClose: false
   };
     private horizontalHoldDuration = 0;
 
@@ -126,7 +129,8 @@ export class MotionTracker {
         flightState: 'tilt',
         trackingActive: false,
         statusText: 'Camera standby',
-        debugGesture: '✈️ TILT MODE'
+        debugGesture: '✈️ TILT MODE',
+        tooClose: false
   };
 
   constructor(videoElement: HTMLVideoElement, previewCanvas: HTMLCanvasElement) {
@@ -391,6 +395,7 @@ export class MotionTracker {
               this.motionData.rollInput = this.smoothedRoll;
               this.motionData.pitchInput = this.smoothedPitch;
               this.motionData.isBraking = false;
+              this.motionData.tooClose = false;
               return;
       }
 
@@ -415,6 +420,18 @@ export class MotionTracker {
         const leftWrist = { x: 1 - rawLeftWrist.x, y: rawLeftWrist.y };
         const rightShoulder = { x: 1 - rawRightShoulder.x, y: rawRightShoulder.y };
         const rightWrist = { x: 1 - rawRightWrist.x, y: rawRightWrist.y };
+
+      // Too Close Detection: shoulders spanning most of the frame width, or an arm
+      // landmark drifting outside the visible frame, both mean the player has moved
+      // too close for the camera to see full arm range of motion reliably.
+      const shoulderSpan = Math.abs(leftShoulder.x - rightShoulder.x);
+        const FRAME_MARGIN = 0.06;
+        const isOutOfFrame = (p: { x: number; y: number }) =>
+                p.x < -FRAME_MARGIN || p.x > 1 + FRAME_MARGIN || p.y < -FRAME_MARGIN || p.y > 1 + FRAME_MARGIN;
+        this.motionData.tooClose =
+                shoulderSpan > 0.5 ||
+                isOutOfFrame(leftShoulder) || isOutOfFrame(rightShoulder) ||
+                isOutOfFrame(leftWrist) || isOutOfFrame(rightWrist);
 
       // Calculate Arm Downward Angles in degrees:
       // Horizontal = 0°, Downward = positive degrees (e.g. +45°), Upward = negative degrees (e.g. -30°)
@@ -636,6 +653,14 @@ export class MotionTracker {
         now: number
       ): void {
         const shoulderWidth = Math.abs(leftShoulder.x - rightShoulder.x);
+
+      // Block calibration progress entirely while too close — surfaces the warning
+      // instead of silently continuing with unreliable landmark data.
+      this.calibrationState.tooClose = this.motionData.tooClose;
+        if (this.motionData.tooClose) {
+                this.calibrationState.statusMessage = '⚠️ Terlalu dekat ke kamera! Mundur selangkah agar bahu & lengan terlihat penuh.';
+                return;
+        }
 
       // Step 1: Detect Body
       if (!this.calibrationState.bodyDetected) {

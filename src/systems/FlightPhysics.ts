@@ -171,8 +171,13 @@ export class FlightPhysics {
     this.velocity.y = THREE.MathUtils.damp(this.velocity.y, targetVelY, 4.5, dt);
     this.velocity.y = THREE.MathUtils.clamp(this.velocity.y, -18.0, 22.0);
 
-    this.velocity.x = dirX * this.forwardSpeed + this.windX;
-    this.velocity.z = dirZ * this.forwardSpeed + this.windZ;
+    // Damp horizontal velocity toward the heading-driven target instead of snapping to it,
+    // so the bird carries a touch of momentum through turns rather than sliding weightlessly.
+    // Kept tight (rate ~9) so ring-passing precision isn't hurt — tune if it feels too floaty/heavy.
+    const targetVelX = dirX * this.forwardSpeed + this.windX;
+    const targetVelZ = dirZ * this.forwardSpeed + this.windZ;
+    this.velocity.x = THREE.MathUtils.damp(this.velocity.x, targetVelX, 9.0, dt);
+    this.velocity.z = THREE.MathUtils.damp(this.velocity.z, targetVelZ, 9.0, dt);
 
     // Integrate position
     this.position.x += this.velocity.x * dt;
