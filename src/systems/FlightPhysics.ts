@@ -234,8 +234,9 @@ export class FlightPhysics {
   /**
    * Apply upward thermal draft force
    */
-  public applyUpdraft(strength: number, dt: number): void {
-    this.verticalImpulse = Math.min(22, this.verticalImpulse + strength * dt * 2.0);
+  public applyUpdraft(strength: number, dt: number, fade = 1): void {
+    // Lift tapers off toward the top of the thermal so the bird levels out instead of rocketing away
+    this.verticalImpulse = Math.min(12 * fade + 2, this.verticalImpulse + strength * fade * dt * 2.0);
     this.inUpdraft = true;
   }
 
@@ -275,22 +276,15 @@ export class FlightPhysics {
     const dz = ringPos.z - this.position.z;
     const distSq = dx * dx + dy * dy + dz * dz;
 
-    // Active within 18 meters when approaching ring
-    if (distSq < 324 && distSq > 2.0) {
+    // Active within 22 meters when approaching the ring: a gentle nudge toward its center.
+    // Applied as a small position correction (max ~9 m/s) so it never yanks the bird around.
+    if (distSq < 484 && distSq > 0.25) {
       const dist = Math.sqrt(distSq);
-      const pullFactor = THREE.MathUtils.clamp((18.0 - dist) / 18.0, 0, 1.0);
-      const pullRate = 6.0 * pullFactor;
-
-      // Steer through velocity rather than teleporting position, so the assist
-      // blends with (and decays through) the normal flight damping instead of snapping.
-      const pullVelX = dx * pullRate;
-      const pullVelY = dy * pullRate;
-
-      this.velocity.x += pullVelX;
-      this.velocity.y += pullVelY;
-
-      this.position.x += pullVelX * dt;
-      this.position.y += pullVelY * dt;
+      const pull = THREE.MathUtils.clamp((22.0 - dist) / 22.0, 0, 1);
+      const step = Math.min(dist, 9.0 * pull * dt);
+      this.position.x += (dx / dist) * step;
+      this.position.y += (dy / dist) * step;
+      this.position.z += (dz / dist) * step * 0.3;
     }
   }
 

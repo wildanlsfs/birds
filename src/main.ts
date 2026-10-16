@@ -34,6 +34,12 @@ class Game {
   private isGameOver = false;
   private cameraShakeTime = 0;
   private cameraShakeIntensity = 0;
+  private flapCooldown = 0;
+  private spaceWasDown = false;
+  private touchFlapWasDown = false;
+  private frameTimes: number[] = [];
+  private pixelRatio = Math.min(window.devicePixelRatio || 1, 1.5);
+  private sizeKey = '';
 
   // Keyboard / Mouse input states
   private keyState = {
@@ -84,15 +90,14 @@ class Game {
       antialias: true,
       powerPreference: 'high-performance'
     });
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25));
+    this.renderer.setPixelRatio(this.pixelRatio);
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.05;
+    this.renderer.toneMappingExposure = 1.0;
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
 
-    // 2. Camera Setup (3rd-person follow)
-    this.camera = new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.5, 3000);
+    // 2. Camera Setup (3rd-person follow); real aspect is applied by resize()
+    this.camera = new THREE.PerspectiveCamera(62, 1, 0.5, 3000);
     this.camera.position.set(0, 25, 32);
 
     // 3. Initialize Systems
@@ -100,6 +105,7 @@ class Game {
     this.physics = new FlightPhysics();
     this.world = new World(this.scene);
     this.waypoints = new WaypointManager(this.scene);
+    this.waypoints.clearSpot = (pos, radius) => this.world.clearRingSpot(pos, radius);
 
     this.bird = new BirdMesh();
     this.scene.add(this.bird.group);
@@ -120,6 +126,7 @@ class Game {
 
     // Event Listeners
     this.setupWindowListeners();
+    this.resize();
     this.setupKeyboardListeners();
     this.setupTouchListeners();
     this.setupUIButtons();
@@ -143,23 +150,34 @@ class Game {
     }
   }
 
-  private setupWindowListeners(): void {
-    const handleResize = () => {
-      const width = window.innerWidth;
-      const height = window.innerHeight;
-      this.camera.aspect = width / height;
-      this.camera.updateProjectionMatrix();
-      this.renderer.setSize(width, height);
-      this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
-    };
+  /**
+   * Size the drawing buffer from the canvas' CSS box (never the other way round). iOS Safari reports
+   * stale window sizes for a moment after rotation, so we re-measure on several signals and dedupe.
+   */
+  private resize = (): void => {
+    const w = Math.max(1, this.canvas.clientWidth || window.innerWidth);
+    const h = Math.max(1, this.canvas.clientHeight || window.innerHeight);
+    const key = `${w}x${h}@${this.pixelRatio}`;
+    if (key === this.sizeKey) return;
+    this.sizeKey = key;
+    this.renderer.setPixelRatio(this.pixelRatio);
+    this.renderer.setSize(w, h, false);
+    this.camera.aspect = w / h;
+    // Portrait screens get a wider vertical FOV so the wings and the next ring stay in view
+    this.baseFov = w < h ? 74 : 62;
+    this.camera.updateProjectionMatrix();
+  };
+  private baseFov = 62;
 
-    window.addEventListener('resize', handleResize);
+  private setupWindowListeners(): void {
+    window.addEventListener('resize', this.resize);
     window.addEventListener('orientationchange', () => {
-      setTimeout(handleResize, 150);
+      this.resize();
+      setTimeout(this.resize, 250);
+      setTimeout(this.resize, 600);
     });
-    if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', handleResize);
-    }
+    window.visualViewport?.addEventListener('resize', this.resize);
+    if ('ResizeObserver' in window) new ResizeObserver(this.resize).observe(this.canvas);
 
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible' && (this.isRunning || this.inCalibration)) {
@@ -173,8 +191,12 @@ class Game {
       if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyB'].includes(e.code)) {
         e.preventDefault();
       }
-      if (e.code === 'KeyR') {
+      if (e.code === 'KeyR' && (this.isRunning || this.isGameOver)) {
         this.restartGame();
+        return;
+      }
+      if (e.code === 'Escape') {
+        this.closeOverlays();
         return;
       }
       if (e.code === 'KeyA' || e.code === 'ArrowLeft') this.keyState.left = true;
@@ -182,15 +204,7 @@ class Game {
       if (e.code === 'KeyW' || e.code === 'ArrowUp') this.keyState.up = true;
       if (e.code === 'KeyS' || e.code === 'ArrowDown') this.keyState.down = true;
       if (e.code === 'KeyB' || e.code === 'ShiftLeft' || e.code === 'ShiftRight') this.keyState.brake = true;
-      if (e.code === 'Space') {
-        if (!this.keyState.space) {
-          // Trigger flap impulse on Space press
-          this.audio.playClapBoom();
-          this.bird.triggerClapBurst();
-          this.hud.showNotification('⚡ FLAP BOOST! ⚡', 'clap');
-        }
-        this.keyState.space = true;
-      }
+      if (e.code === 'Space') this.keyState.space = true;
     });
 
     window.addEventListener('keyup', (e) => {
@@ -284,9 +298,6 @@ class Game {
     btnFlap.addEventListener('touchstart', (e: TouchEvent) => {
       e.preventDefault();
       this.touchState.flap = true;
-      this.audio.playClapBoom();
-      this.bird.triggerClapBurst();
-      this.hud.showNotification('⚡ FLAP BOOST! ⚡', 'clap');
     }, { passive: false });
 
     btnFlap.addEventListener('touchend', (e: TouchEvent) => {
@@ -336,8 +347,11 @@ class Game {
       this.isRunning = true;
       this.controlMode = 'keyboard';
       document.getElementById('pip-webcam-container')!.style.display = 'none';
-      this.touchControlsEl.classList.add('active');
-      this.hud.showNotification('🦅 FLIGHT STARTED! (TOUCH & KEYS ACTIVE)', 'boost');
+      document.body.classList.remove('cam-mode');
+      document.getElementById('btn-camera-text')!.textContent = 'Tombol';
+      this.touchControlsEl.classList.toggle('active', this.isTouchDevice);
+      this.requestWakeLock();
+      this.restartGame();
     });
 
     // Toggle Camera
@@ -345,14 +359,16 @@ class Game {
     btnToggleCam.addEventListener('click', async () => {
       if (this.controlMode === 'camera') {
         this.controlMode = 'keyboard';
-        document.getElementById('btn-camera-text')!.textContent = 'Keys/Touch';
+        document.getElementById('btn-camera-text')!.textContent = 'Tombol';
         document.getElementById('pip-webcam-container')!.style.display = 'none';
-        this.touchControlsEl.classList.add('active');
+        document.body.classList.remove('cam-mode');
+        this.touchControlsEl.classList.toggle('active', this.isTouchDevice);
         this.motionTracker.stop();
       } else {
         this.controlMode = 'camera';
-        document.getElementById('btn-camera-text')!.textContent = 'Camera';
+        document.getElementById('btn-camera-text')!.textContent = 'Kamera';
         document.getElementById('pip-webcam-container')!.style.display = 'block';
+        document.body.classList.add('cam-mode');
         if (!this.isTouchDevice) {
           this.touchControlsEl.classList.remove('active');
         }
@@ -365,7 +381,7 @@ class Game {
     btnAudio.addEventListener('click', () => {
       const isMuted = this.audio.toggleMute();
       document.getElementById('audio-icon')!.textContent = isMuted ? '🔇' : '🔊';
-      document.getElementById('audio-text')!.textContent = isMuted ? 'Muted' : 'Audio ON';
+      document.getElementById('audio-text')!.textContent = isMuted ? 'Senyap' : 'Suara';
     });
 
     // Help Modal
@@ -424,6 +440,8 @@ class Game {
 
     btnCloseHangar?.addEventListener('click', () => {
       hangarModal.classList.remove('visible');
+      // Came here from the crash screen: closing the hangar starts the next flight
+      if (this.isGameOver) this.restartGame();
     });
 
     document.querySelectorAll('.hangar-bird-card .btn-select-bird').forEach((btn) => {
@@ -433,7 +451,7 @@ class Game {
         if (type) {
           this.audio.init();
           this.selectBirdProfile(type);
-          this.hud.showNotification(`🦅 Memilih ${BIRD_PROFILES[type].name}!`, 'boost');
+          this.hud.showNotification(`${BIRD_PROFILES[type].icon} ${shortName(BIRD_PROFILES[type].name)} siap!`, 'boost');
         }
       });
     });
@@ -459,7 +477,7 @@ class Game {
     this.bird.setProfile(profile);
     this.physics.setProfile(profile);
     this.audio.playBirdSelectSound();
-    this.hud.setBirdBadge(profile.name, profile.icon);
+    this.hud.setBirdBadge(shortName(profile.name), profile.icon);
     this.hud.refreshBestScores();
 
     // Update active state in Welcome modal buttons
@@ -497,6 +515,7 @@ class Game {
     // Make sure PIP container is displayed so camera video stream runs
     const pipContainer = document.getElementById('pip-webcam-container')!;
     pipContainer.style.display = 'block';
+    document.body.classList.add('cam-mode');
 
     this.requestWakeLock();
     this.motionTracker.start().catch((err) => {
@@ -628,7 +647,7 @@ class Game {
       { text: '3', high: false },
       { text: '2', high: false },
       { text: '1', high: false },
-      { text: 'SOAR!', high: true }
+      { text: 'TERBANG!', high: true }
     ];
 
     let idx = 0;
@@ -652,10 +671,8 @@ class Game {
         this.hud.resetTimer();
         this.isRunning = true;
         this.countdownActive = false;
-        if (this.isTouchDevice || this.controlMode === 'keyboard') {
-          this.touchControlsEl.classList.add('active');
-        }
-        this.hud.showNotification('🦅 TERBANG! KEPATKAN SAYAP UNTUK NAIK!', 'boost');
+        this.touchControlsEl.classList.toggle('active', this.isTouchDevice);
+        this.hud.showNotification('🦅 TERBANG! KEJAR CINCIN EMAS!', 'boost');
       }
     };
 
@@ -673,6 +690,9 @@ class Game {
     this.isRunning = false; // Freeze physics/world until the countdown finishes
     this.feathersCollected = 0;
     this.cameraShakeTime = 0;
+    this.flapCooldown = 0;
+    this.speedLinesEl.classList.remove('active');
+    if (this.gameOverTimer) window.clearTimeout(this.gameOverTimer);
 
     // 1. Reset flight physics & bird
     this.physics.reset();
@@ -691,6 +711,10 @@ class Game {
       }
     );
 
+    // Show the bird on its perch during the countdown, camera snapped behind it
+    this.physics.applyTransform(this.bird.group);
+    this.updateCamera(10);
+
     // 2. Reset waypoints & rings
     this.waypoints.reset();
 
@@ -700,7 +724,7 @@ class Game {
     // 4. Reset HUD & stats
     this.hud.reset();
     this.hud.setFeathers(0);
-    this.hud.setBirdBadge(BIRD_PROFILES[this.currentBirdType].name, BIRD_PROFILES[this.currentBirdType].icon);
+    this.hud.setBirdBadge(shortName(BIRD_PROFILES[this.currentBirdType].name), BIRD_PROFILES[this.currentBirdType].icon);
     this.hud.refreshBestScores();
     this.lastMilestoneDistance = 0;
     this.totalDistanceTraveled = 0;
@@ -728,8 +752,16 @@ class Game {
     requestAnimationFrame(this.animate);
 
     const now = performance.now();
-    const delta = Math.min((now - this.lastTime) / 1000, 0.1);
+    const rawDelta = (now - this.lastTime) / 1000;
+    const delta = Math.min(rawDelta, 0.1);
     this.lastTime = now;
+    this.adaptQuality(rawDelta);
+
+    // Help / hangar opened mid-flight: freeze the simulation, keep drawing
+    if (this.isRunning && !this.isGameOver && this.overlayOpen()) {
+      this.renderer.render(this.scene, this.camera);
+      return;
+    }
 
     if (!this.isRunning) {
       // Process motion tracking & calibration during check phase
@@ -738,6 +770,7 @@ class Game {
         this.updateCalibrationUI();
       }
       this.world.update(delta);
+      this.waypoints.update(delta);
       this.renderer.render(this.scene, this.camera);
       return;
     }
@@ -763,13 +796,13 @@ class Game {
       rollInput = currentMotion.rollInput;
       rollAngleRad = currentMotion.rollAngleRad;
       pitchInput = currentMotion.pitchInput;
-      isFlapping = currentMotion.isFlapping;
+      isFlapping = currentMotion.isFlapping && this.flapCooldown <= 0;
       isBraking = currentMotion.isBraking || this.keyState.brake;
       flapIntensity = currentMotion.flapIntensity;
       trackingStatus = currentMotion.statusText;
 
       if (currentMotion.tooClose && !this.wasTooCloseToCam) {
-        this.hud.showNotification('⚠️ TERLALU DEKAT KE KAMERA! MUNDUR SEDIKIT', 'warning');
+        this.hud.showNotification('⚠️ MUNDUR SEDIKIT DARI KAMERA', 'warning');
       }
       this.wasTooCloseToCam = currentMotion.tooClose;
 
@@ -784,22 +817,16 @@ class Game {
       }
       if (this.keyState.down) pitchInput = -0.85; // Dive Down!
       if (this.keyState.up) pitchInput = 0.85;    // Climb Up!
-      if (this.keyState.space) {
-        isFlapping = true;
-        flapIntensity = 1.0;
-      }
     } else {
       // Keyboard & Touch mode
       if (this.keyState.left) rollInput = -1.0;   // Turn Left
       if (this.keyState.right) rollInput = 1.0;   // Turn Right
       if (this.keyState.down) pitchInput = -0.85; // Dive Down!
       if (this.keyState.up) pitchInput = 0.85;    // Climb Up!
-      isFlapping = this.keyState.space;
       isBraking = this.keyState.brake;
-      flapIntensity = isFlapping ? 1.0 : 0;
       trackingStatus = this.isTouchDevice
-        ? 'Touch Controls (Stick=Steer/Pitch, 🪽=Flap, 🛑=Brake)'
-        : 'Keyboard Mode (Space=Flap, B/Shift=Brake, A/D=Turn, S/W=Down/Up)';
+        ? 'Stik = belok/naik-turun · 🪽 = kepak · 🛑 = rem'
+        : 'Spasi = kepak · A/D = belok · W/S = naik/turun · Shift = rem';
     }
 
     // Touch controls input blend / override
@@ -810,10 +837,17 @@ class Game {
     if (Math.abs(this.touchState.pitch) > 0.05) {
       pitchInput = this.touchState.pitch * 0.85;
     }
-    if (this.touchState.flap) {
+    // Space / FLAP button: flap on press, then keep flapping at a steady wingbeat while held
+    const holdFlap = this.keyState.space || this.touchState.flap;
+    const pressed = (this.keyState.space && !this.spaceWasDown) || (this.touchState.flap && !this.touchFlapWasDown);
+    this.spaceWasDown = this.keyState.space;
+    this.touchFlapWasDown = this.touchState.flap;
+    this.flapCooldown -= delta;
+    if (holdFlap && (pressed || this.flapCooldown <= 0)) {
       isFlapping = true;
       flapIntensity = 1.0;
     }
+    if (isFlapping) this.flapCooldown = 0.32;
     if (this.touchState.brake) {
       isBraking = true;
     }
@@ -829,9 +863,8 @@ class Game {
 
     // 2. Audio & Visuals on Wing Flap
     if (isFlapping) {
-      this.audio.playClapBoom();
+      this.audio.playFlap();
       this.bird.triggerFlapBurst();
-      this.hud.showNotification('🪽 WING FLAP! 🪽', 'flap');
     }
 
     // 3. Update Flight Physics
@@ -844,10 +877,13 @@ class Game {
     // 4. Check Updraft Thermals
     const updraft = this.world.checkUpdraft(this.physics.position);
     if (updraft) {
-      this.physics.applyUpdraft(updraft.strength, delta);
-      if (!this.physics.inUpdraft) {
+      const wasIn = this.physics.inUpdraft;
+      const top = updraft.center.y + updraft.height / 2;
+      const fade = THREE.MathUtils.clamp((top - this.physics.position.y) / (updraft.height * 0.5), 0, 1);
+      this.physics.applyUpdraft(updraft.strength, delta, fade);
+      if (!wasIn) {
         this.audio.playUpdraftEnter();
-        this.hud.showNotification('🌀 UPDRAFT THERMAL!', 'updraft');
+        this.hud.showNotification('🌀 ANGIN NAIK!', 'updraft');
       }
     } else {
       this.physics.inUpdraft = false;
@@ -860,7 +896,7 @@ class Game {
       this.waypoints.totalScore += 150;
       this.audio.playFeatherCollectSound();
       this.hud.setFeathers(this.feathersCollected);
-      this.hud.showNotification('🪶 +150 BULU EMAS!', 'feather');
+      this.hud.showNotification('🪶 +150 BULU EMAS', 'feather');
     }
 
     // Calculate true 360-degree distance traveled
@@ -887,20 +923,16 @@ class Game {
           score: this.waypoints.totalScore,
           rings: this.waypoints.collectedCount
         });
-        this.hud.showGameOver(
-          terrainHit.reason,
-          dist,
-          this.waypoints.totalScore,
-          this.waypoints.collectedCount,
-          profile.name,
-          best.distance,
-          isNewBest
-        );
-        this.hud.showNotification(`💥 CRASH! ${terrainHit.reason}`, 'warning');
+        const score = this.waypoints.totalScore;
+        const rings = this.waypoints.collectedCount;
+        this.speedLinesEl.classList.remove('active');
+        this.hud.showNotification('💥 BRAK!', 'warning');
+        this.gameOverTimer = window.setTimeout(() => {
+          this.hud.showGameOver(terrainHit.reason, dist, score, rings, shortName(profile.name), best.distance, isNewBest);
+        }, 900);
       } else if (!terrainHit.isFatal) {
         this.physics.handleTerrainCollision(terrainHit.safeY);
         this.audio.playFlap();
-        this.hud.showNotification('⛰️ Memantul Naik dari Daratan!', 'flap');
       }
     }
 
@@ -911,9 +943,9 @@ class Game {
 
       if (ringResult.isBoost) {
         this.physics.triggerBoost();
-        this.hud.showNotification('🚀 TURBO BOOST!', 'boost');
+        this.hud.showNotification('🚀 TURBO!', 'boost');
       } else {
-        this.hud.showNotification(`+250 RING! (x${this.waypoints.combo})`, 'ring');
+        this.hud.showNotification(`⭕ +${250 * Math.max(1, this.waypoints.combo - 1)}${this.waypoints.combo > 2 ? `  ×${this.waypoints.combo - 1}` : ''}`, 'ring');
       }
     }
 
@@ -921,7 +953,7 @@ class Game {
     if (distanceTraveled >= this.lastMilestoneDistance + 1000) {
       this.lastMilestoneDistance = Math.floor(distanceTraveled / 1000) * 1000;
       this.audio.playVictoryFanfare();
-      this.hud.showNotification(`🏆 ${this.lastMilestoneDistance}m DISTANCE!`, 'boost');
+      this.hud.showNotification(`🏆 ${this.lastMilestoneDistance} METER!`, 'boost');
     }
 
     // 6. Update Entities & Animations (1:1 Arm Tracking & Kinematics)
@@ -947,9 +979,9 @@ class Game {
     // Storm weather notifications on transition only
     const inStorm = this.world.stormIntensity > 0.4;
     if (inStorm && !this.wasInStorm) {
-      this.hud.showNotification('⛈️ STORM AHEAD! HOLD STEADY!', 'warning');
+      this.hud.showNotification('⛈️ ANGIN KENCANG! TAHAN!', 'warning');
     } else if (!inStorm && this.wasInStorm) {
-      this.hud.showNotification('☀️ SKIES CLEARING!', 'boost');
+      this.hud.showNotification('☀️ CUACA CERAH LAGI', 'boost');
     }
     this.wasInStorm = inStorm;
 
@@ -990,7 +1022,7 @@ class Game {
       totalRings: this.waypoints.rings.length,
       distance: distanceTraveled,
       feathersCollected: this.feathersCollected,
-      birdName: `${BIRD_PROFILES[this.currentBirdType].icon} ${BIRD_PROFILES[this.currentBirdType].name}`,
+      birdName: `${BIRD_PROFILES[this.currentBirdType].icon} ${shortName(BIRD_PROFILES[this.currentBirdType].name)}`,
       isFlapping,
       inUpdraft: this.physics.inUpdraft,
       isBoost: this.physics.boostTimer > 0,
@@ -1003,6 +1035,40 @@ class Game {
     this.renderer.render(this.scene, this.camera);
   };
 
+  private gameOverTimer: number | null = null;
+
+  private overlayOpen(): boolean {
+    return !!document.querySelector('#help-modal.visible, #hangar-modal.visible');
+  }
+
+  private closeOverlays(): void {
+    document.getElementById('help-modal')?.classList.remove('visible');
+    document.getElementById('hangar-modal')?.classList.remove('visible');
+  }
+
+  /** Drop resolution, then shadows, when frames are consistently slow (phones, old laptops). */
+  private adaptQuality(rawDelta: number): void {
+    if (!this.isRunning || this.isGameOver || rawDelta > 0.25) return;
+    this.frameTimes.push(rawDelta);
+    if (this.frameTimes.length < 90) return;
+    const avg = this.frameTimes.reduce((a, b) => a + b, 0) / this.frameTimes.length;
+    this.frameTimes = [];
+    if (avg <= 0.022) return;
+    if (this.pixelRatio > 1) {
+      this.pixelRatio = Math.max(1, this.pixelRatio - 0.25);
+      this.resize();
+    } else if (this.pixelRatio > 0.75) {
+      this.pixelRatio = 0.75;
+      this.resize();
+    } else if (this.renderer.shadowMap.enabled) {
+      this.renderer.shadowMap.enabled = false;
+      this.scene.traverse((o) => {
+        const m = (o as THREE.Mesh).material as THREE.Material | undefined;
+        if (m) m.needsUpdate = true;
+      });
+    }
+  }
+
   /**
    * Smooth 3rd-person follow camera with banking roll and speed FOV dilation
    */
@@ -1013,7 +1079,7 @@ class Game {
     const roll = this.physics.roll;
 
     // Follow offset behind and above bird
-    const distanceBehind = 11.0;
+    const distanceBehind = this.baseFov > 62 ? 13.5 : 11.0; // portrait: pull back so both wingtips fit
     const heightAbove = 3.6;
 
     // Target position calculated in bird's local forward orientation
@@ -1028,7 +1094,7 @@ class Game {
     );
 
     // Smooth camera position interpolation with frame-rate independent damping
-    const dt = Math.min(delta, 0.1);
+    const dt = delta >= 10 ? 10 : Math.min(delta, 0.1); // delta >= 10 snaps the camera into place
     this.camera.position.x = THREE.MathUtils.damp(this.camera.position.x, targetCamPos.x, 8.5, dt);
     this.camera.position.y = THREE.MathUtils.damp(this.camera.position.y, targetCamPos.y, 8.5, dt);
     this.camera.position.z = THREE.MathUtils.damp(this.camera.position.z, targetCamPos.z, 8.5, dt);
@@ -1053,14 +1119,20 @@ class Game {
     this.camera.lookAt(lookTarget);
 
     // Dynamic FOV widening during high speeds
-    const targetFOV = 62 + Math.max(0, (this.physics.forwardSpeed - 22) * 0.45);
-    this.camera.fov = THREE.MathUtils.lerp(this.camera.fov, targetFOV, delta * 4.0);
+    const targetFOV = this.baseFov + Math.max(0, (this.physics.forwardSpeed - 22) * 0.45);
+    this.camera.fov = THREE.MathUtils.lerp(this.camera.fov, targetFOV, Math.min(1, delta * 4.0));
     this.camera.updateProjectionMatrix();
   }
+}
+
+/** "Elang Langit (Golden Falcon)" -> "Elang Langit" */
+function shortName(name: string): string {
+  return name.split(' (')[0];
 }
 
 // Start Game Instance
 window.addEventListener('DOMContentLoaded', () => {
   const game = new Game();
   game.start();
+  if (location.search.includes('debug')) (window as unknown as { __game: Game }).__game = game;
 });

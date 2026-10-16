@@ -98,7 +98,7 @@ export class HUD {
 
     // Altitude
     const altM = Math.max(0, Math.round(state.altitude + 20));
-    this.altEl.textContent = `${altM}m`;
+    this.altEl.textContent = `${altM}`;
 
     // Score & Combo
     this.scoreEl.textContent = state.score.toLocaleString();
@@ -111,8 +111,8 @@ export class HUD {
 
     // Ring waypoint progression in endless mode
     const distM = state.distance !== undefined ? Math.round(state.distance) : 0;
-    this.ringCountEl.textContent = `${state.currentRing} RINGS (${distM}m)`;
-    const progressCycle = ((state.currentRing % 10) + 1) * 10;
+    this.ringCountEl.textContent = `${state.currentRing} · ${distM}m`;
+    const progressCycle = (state.currentRing % 10) * 10;
     this.ringProgressEl.style.width = `${progressCycle}%`;
 
     // Compass arrow rotation pointing toward current waypoint
@@ -196,7 +196,7 @@ export class HUD {
     this.startTime = performance.now();
     this.scoreEl.textContent = '0';
     this.comboEl.style.display = 'none';
-    this.ringCountEl.textContent = '0 / 12';
+    this.ringCountEl.textContent = '0 · 0m';
     this.ringProgressEl.style.width = '0%';
     this.timerEl.textContent = '00:00';
     if (this.feathersCountEl) this.feathersCountEl.textContent = '0';

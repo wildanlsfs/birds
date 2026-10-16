@@ -22,7 +22,10 @@ Fly through an infinite floating sky archipelago, collect waypoint rings, ride s
   - Dynamic turbo boost rings and combo multipliers up to 10x.
 - **🎵 Procedural Dynamic Web Audio**:
   - Real-time synthesized airspeed wind rushing, wing flap swooshes, sonic boom claps, ring chimes, and altitude thermal humming.
+- **🎨 Stylized cartoon look**: three hand-built bird models (forked-tail swift, fan-tail falcon, phoenix with crest & plumes) with ink outlines, height-banded terrain colors, soft cotton clouds, and a sun-lit sky.
 - **⚡ Ultra-Lightweight & Optimized**:
+  - Each terrain chunk's trees, rocks and islands are merged into a few vertex-colored meshes (~130 draw calls for the whole world instead of ~700), feathers are instanced, and costly CSS backdrop blurs are gone from the in-game HUD.
+  - Adaptive quality: resolution and then shadows step down automatically on slow devices.
   - Code-split dynamic imports: initial bundle size under 60 kB.
   - Self-hosted MediaPipe WASM and lite float16 model with persistent browser `CacheStorage` for 0ms subsequent loads.
   - Camera resolution capped at 480p and inference throttled to 20 FPS for silky smooth 60 FPS Three.js rendering on laptops.
@@ -33,14 +36,16 @@ Fly through an infinite floating sky archipelago, collect waypoint rings, ride s
 
 ## 🕹️ Controls Guide
 
-| Action | Webcam Motion Gesture | Keyboard Control |
-|---|---|---|
-| **Flap Wings (Lift Up)** | Ayunkan kedua tangan ke bawah dengan cepat | <kbd>Space</kbd> |
-| **Bank / Roll Turn** | Miringkan kedua lengan seperti sayap pesawat | <kbd>A</kbd> / <kbd>D</kbd> atau <kbd>←</kbd> / <kbd>→</kbd> |
-| **Dive / Menukik** | Turunkan kedua tangan di samping badan | <kbd>W</kbd> atau <kbd>↑</kbd> |
-| **Climb / Mendaki** | Angkat kedua tangan sedikit ke atas | <kbd>S</kbd> atau <kbd>↓</kbd> |
-| **Airbrake / Mengerem** | Angkat kedua tangan tinggi ke atas | <kbd>B</kbd> atau <kbd>Shift</kbd> |
-| **Quick Restart** | Klik tombol Restart di layar | <kbd>R</kbd> |
+| Aksi | Gerakan kamera | Keyboard | Layar sentuh |
+|---|---|---|---|
+| **Kepak / naik** | Ayunkan kedua tangan ke bawah | <kbd>Space</kbd> (tahan = terus mengepak) | Tombol 🪽 KEPAK |
+| **Belok** | Miringkan lengan seperti sayap pesawat | <kbd>A</kbd> / <kbd>D</kbd> atau <kbd>←</kbd> / <kbd>→</kbd> | Stik kiri-kanan |
+| **Naik / turun** | Angkat / turunkan lengan sedikit | <kbd>W</kbd> / <kbd>S</kbd> atau <kbd>↑</kbd> / <kbd>↓</kbd> | Stik atas-bawah |
+| **Rem udara** | Angkat kedua tangan tinggi | <kbd>Shift</kbd> / <kbd>B</kbd> | Tombol 🛑 REM |
+| **Jeda** | — | <kbd>Esc</kbd> menutup jendela | Tombol ⏸️ |
+| **Ulangi** | — | <kbd>R</kbd> | Tombol 🔄 |
+
+Membuka **Jeda** atau **Pilih Burung** di tengah penerbangan otomatis membekukan permainan.
 
 ---
 

@@ -1,10 +1,12 @@
 <!doctype html>
-<html lang="en">
+<html lang="id">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-    <title>AeroWing 3D - Motion Controlled Bird Flight Game</title>
-    <meta name="description" content="Experience 3D flight through a floating sky archipelago using real-time webcam motion controls. Clap your hands to flap and soar, tilt your hands like wings to bank and glide." />
+    <title>AeroWing 3D</title>
+    <meta name="description" content="Game terbang 3D: jadilah burung dan terbang melintasi kepulauan langit pakai gerakan tangan di depan webcam, keyboard, atau layar sentuh." />
+    <meta name="theme-color" content="#0b1726" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     
     <!-- Google Fonts: Outfit (modern geometric sans) + JetBrains Mono (flight instruments) -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -24,11 +26,11 @@
     <header class="hud-topbar" id="hud-topbar">
       <!-- Waypoint Progress Widget -->
       <div class="hud-widget progress-widget" id="widget-waypoint">
-        <div class="widget-label">WAYPOINTS</div>
+        <div class="widget-label">CINCIN</div>
         <div class="progress-bar-container">
           <div id="ring-progress-bar" class="progress-bar-fill"></div>
         </div>
-        <div class="widget-value-sm" id="hud-ring-count">0 / 16</div>
+        <div class="widget-value-sm" id="hud-ring-count">0 · 0m</div>
       </div>
 
       <!-- Navigation Compass Radar -->
@@ -37,12 +39,12 @@
           <div class="compass-north">N</div>
           <div id="compass-arrow" class="compass-needle"></div>
         </div>
-        <div class="widget-label">BEACON</div>
+        <div class="widget-label">ARAH</div>
       </div>
 
       <!-- Golden Feathers Widget -->
       <div class="hud-widget feather-widget" id="widget-feather">
-        <div class="widget-label">FEATHERS</div>
+        <div class="widget-label">BULU</div>
         <div class="feather-counter-box">
           <span class="feather-icon">🪶</span>
           <span id="hud-feather-count" class="widget-value-sm">0</span>
@@ -68,26 +70,26 @@
       <div class="instrument-card glass-panel" id="gauge-airspeed">
         <div class="instrument-header">
           <span class="instrument-icon">⚡</span>
-          <span class="instrument-title">AIRSPEED</span>
+          <span class="instrument-title">KECEPATAN</span>
         </div>
         <div class="instrument-body">
           <span id="hud-speed" class="instrument-value">79</span>
           <span class="instrument-unit">KM/H</span>
         </div>
-        <div class="dive-hint">DIVE TO GAIN SPEED</div>
+        <div class="dive-hint">MENUKIK = LEBIH CEPAT</div>
       </div>
 
       <!-- Altimeter Indicator -->
       <div class="instrument-card glass-panel" id="gauge-altitude">
         <div class="instrument-header">
           <span class="instrument-icon">▲</span>
-          <span class="instrument-title">ALTITUDE</span>
+          <span class="instrument-title">KETINGGIAN</span>
         </div>
         <div class="instrument-body">
-          <span id="hud-altitude" class="instrument-value">42m</span>
-          <span class="instrument-unit">MSL</span>
+          <span id="hud-altitude" class="instrument-value">42</span>
+          <span class="instrument-unit">M</span>
         </div>
-        <div class="dive-hint">FLAP WINGS TO SOAR HIGH</div>
+        <div class="dive-hint">KEPAK SAYAP UNTUK NAIK</div>
       </div>
     </section>
 
@@ -98,30 +100,30 @@
     <footer class="hud-bottombar" id="hud-bottombar">
       <!-- Status Badge -->
       <div class="hud-status-badge glass-panel" id="tracking-status-badge">
-        Initializing camera...
+        Menyiapkan kontrol...
       </div>
 
       <!-- Quick Action Controls -->
       <div class="hud-action-buttons">
-        <button id="btn-open-hangar" class="btn-hud" aria-label="Select Bird Species">
+        <button id="btn-open-hangar" class="btn-hud" aria-label="Pilih burung" title="Pilih burung">
           <span class="btn-icon">🦅</span>
           <span class="btn-text">Burung</span>
         </button>
-        <button id="btn-restart-flight" class="btn-hud btn-restart" aria-label="Restart Flight (R)">
+        <button id="btn-restart-flight" class="btn-hud btn-restart" aria-label="Ulangi (R)" title="Ulangi (R)">
           <span class="btn-icon">🔄</span>
-          <span class="btn-text">Restart</span>
+          <span class="btn-text">Ulang</span>
         </button>
-        <button id="btn-toggle-camera" class="btn-hud" aria-label="Toggle Camera Motion Mode">
+        <button id="btn-toggle-camera" class="btn-hud" aria-label="Ganti kamera / tombol" title="Ganti kamera / tombol">
           <span class="btn-icon">📷</span>
-          <span id="btn-camera-text" class="btn-text">Camera</span>
+          <span id="btn-camera-text" class="btn-text">Kamera</span>
         </button>
-        <button id="btn-toggle-audio" class="btn-hud" aria-label="Toggle Audio Mute">
+        <button id="btn-toggle-audio" class="btn-hud" aria-label="Suara" title="Suara">
           <span class="btn-icon" id="audio-icon">🔊</span>
-          <span id="audio-text" class="btn-text">Sound</span>
+          <span id="audio-text" class="btn-text">Suara</span>
         </button>
-        <button id="btn-open-help" class="btn-hud" aria-label="Controls & Calibration Help">
-          <span class="btn-icon">⚙️</span>
-          <span class="btn-text">Help</span>
+        <button id="btn-open-help" class="btn-hud" aria-label="Bantuan & jeda" title="Bantuan & jeda">
+          <span class="btn-icon">⏸️</span>
+          <span class="btn-text">Jeda</span>
         </button>
       </div>
     </footer>
@@ -130,7 +132,7 @@
     <aside class="pip-webcam-container glass-panel" id="pip-webcam-container">
       <div class="pip-header">
         <span class="pip-indicator live"></span>
-        <span class="pip-title">MOTION CONTROLLER</span>
+        <span class="pip-title">KAMERA GERAK</span>
         <button id="btn-minimize-pip" class="pip-toggle" aria-label="Minimize webcam view">_</button>
       </div>
       <div class="pip-viewport">
@@ -140,8 +142,8 @@
         <canvas id="webcam-overlay"></canvas>
       </div>
       <div class="pip-controls-guide">
-        <span>🪽 Flap Wings</span>
-        <span>✈️ Tilt to Bank</span>
+        <span>🪽 Ayun = kepak</span>
+        <span>✈️ Miring = belok</span>
       </div>
     </aside>
 
@@ -151,19 +153,19 @@
       <div id="touch-stick-zone" class="touch-stick-zone">
         <div id="touch-stick-base" class="touch-stick-base">
           <div id="touch-stick-knob" class="touch-stick-knob"></div>
-          <span class="stick-hint">STEER / PITCH</span>
+          <span class="stick-hint">BELOK · NAIK/TURUN</span>
         </div>
       </div>
 
       <!-- Right side: Flight Action Buttons (Flap & Airbrake) -->
       <div class="touch-actions-zone">
-        <button id="btn-touch-brake" class="btn-touch-circle btn-touch-brake" aria-label="Air Brake">
+        <button id="btn-touch-brake" class="btn-touch-circle btn-touch-brake" aria-label="Rem udara">
           <span class="touch-btn-icon">🛑</span>
-          <span class="touch-btn-text">BRAKE</span>
+          <span class="touch-btn-text">REM</span>
         </button>
-        <button id="btn-touch-flap" class="btn-touch-circle btn-touch-flap" aria-label="Flap Wings">
+        <button id="btn-touch-flap" class="btn-touch-circle btn-touch-flap" aria-label="Kepakkan sayap">
           <span class="touch-btn-icon">🪽</span>
-          <span class="touch-btn-text">FLAP</span>
+          <span class="touch-btn-text">KEPAK</span>
         </button>
       </div>
     </div>
@@ -171,36 +173,45 @@
     <!-- Interactive Welcome / Start Modal -->
     <div id="welcome-modal" class="game-modal-backdrop visible">
       <div class="game-modal-card glass-panel-modal">
-        <div class="modal-badge">3D FLIGHT SIMULATOR</div>
+        <div class="modal-badge">GAME TERBANG 3D</div>
         <h1 class="modal-title">AEROWING 3D</h1>
-        <p class="modal-subtitle">Fly through the floating sky archipelago using your body, touch, or keys</p>
+        <p class="modal-subtitle">Jadi burung &amp; terbang melintasi kepulauan langit pakai gerakan tubuhmu!</p>
 
         <div class="instructions-grid">
           <div class="instruction-card">
             <div class="instruction-icon">🪽</div>
-            <h3>Flap Wings Like a Bird</h3>
-            <p>Move your arms/hands up & down like a bird flapping wings to generate upward lift force!</p>
+            <div>
+              <h3>Kepakkan tangan</h3>
+              <p>Ayun kedua lengan ke bawah untuk terbang naik</p>
+            </div>
           </div>
           <div class="instruction-card">
             <div class="instruction-icon">✈️</div>
-            <h3>Airplane Wings</h3>
-            <p>Tilt your hands like airplane wings (left hand up, right hand down) to bank and roll smoothly.</p>
+            <div>
+              <h3>Miringkan lengan</h3>
+              <p>Seperti sayap pesawat untuk belok kiri &amp; kanan</p>
+            </div>
           </div>
           <div class="instruction-card">
-            <div class="instruction-icon">🦅</div>
-            <h3>Dive & Glide</h3>
-            <p>Lower your hands or pitch down to enter a steep dive for turbo speed; soar on thermals.</p>
+            <div class="instruction-icon">⭕</div>
+            <div>
+              <h3>Lewati cincin emas</h3>
+              <p>Kejar combo, ambil bulu emas 🪶, hindari tebing</p>
+            </div>
           </div>
           <div class="instruction-card">
-            <div class="instruction-icon">📱⌨️</div>
-            <h3>Touch & Keyboard</h3>
-            <p><kbd>Space</kbd> or <b>Touch Button</b> to Flap &bull; <kbd>A</kbd>/<kbd>D</kbd> or <b>Touch Stick</b> to Bank &bull; <kbd>W</kbd>/<kbd>S</kbd> to Pitch.</p>
+            <div class="instruction-icon">⌨️</div>
+            <div>
+              <h3>Tanpa kamera?</h3>
+              <p class="keys-hint"><kbd>Spasi</kbd> kepak · <kbd>A</kbd><kbd>D</kbd> belok · <kbd>W</kbd><kbd>S</kbd> naik/turun</p>
+              <p class="touch-hint">Pakai stik &amp; tombol di layar</p>
+            </div>
           </div>
         </div>
 
         <!-- Bird Selection in Welcome Modal -->
         <div class="welcome-bird-selection">
-          <div class="selection-heading">PILIH TIPE BURUNG ANDA:</div>
+          <div class="selection-heading">Pilih burungmu</div>
           <div class="bird-selector-row">
             <button type="button" class="bird-card-btn" data-bird="small">
               <span class="bird-icon">🪽</span>
@@ -231,11 +242,11 @@
 
         <div class="modal-actions">
           <button id="btn-start-game" class="btn-primary-glow">
-            <span>START FLIGHT (CAMERA MOTION)</span>
+            <span>📷 MAIN PAKAI KAMERA</span>
             <span class="btn-arrow">➔</span>
           </button>
           <button id="btn-start-keyboard" class="btn-secondary-flat">
-            Play with Keyboard / Touch Controls
+            Main pakai keyboard / layar sentuh
           </button>
         </div>
       </div>
@@ -246,7 +257,7 @@
       <div class="game-modal-card glass-panel-modal calibration-card">
         <div class="modal-badge">PRE-FLIGHT CALIBRATION</div>
         <h2 class="modal-title-sm">CONTROLLER CHECK</h2>
-        <p class="modal-subtitle">Pastikan kamera membaca gerakan lengan Anda sebelum lepas landas</p>
+        <p class="modal-subtitle">Pastikan kamera bisa melihat bahu &amp; kedua lenganmu</p>
 
         <!-- Step Checklist -->
         <div class="calibration-checklist">
@@ -315,35 +326,41 @@
 
     <!-- 3... 2... 1... SOAR! Countdown Overlay -->
     <div id="countdown-overlay" class="countdown-overlay">
-      <div id="countdown-number" class="countdown-number">3</div>
+      <div id="countdown-number" class="countdown-number"></div>
     </div>
 
     <!-- Controls & Calibration Help Modal -->
     <div id="help-modal" class="game-modal-backdrop">
       <div class="game-modal-card glass-panel-modal">
-        <h2 class="modal-title-sm">Motion Controls & Mechanics</h2>
+        <div class="modal-badge">⏸️ JEDA</div>
+        <h2 class="modal-title-sm">Cara Bermain</h2>
         <div class="mechanics-list">
           <div class="mechanic-item">
             <span class="m-icon">⭕</span>
-            <div>
-              <strong>Waypoint Rings:</strong> Fly through sequential glowing toruses to maintain speed and build your combo multiplier.
-            </div>
-          </div>
-          <div class="mechanic-item">
-            <span class="m-icon">🌀</span>
-            <div>
-              <strong>Updraft Thermals:</strong> Soar into the spiraling blue particle columns around floating islands to gain free altitude without flapping.
-            </div>
+            <div><strong>Cincin emas:</strong> terbang menembus cincin berurutan. Tiap cincin beruntun menaikkan combo (sampai ×10).</div>
           </div>
           <div class="mechanic-item">
             <span class="m-icon">🚀</span>
-            <div>
-              <strong>Cyan Boost Rings:</strong> Fly through cyan rings to receive instantaneous turbo forward airspeed!
-            </div>
+            <div><strong>Cincin biru:</strong> memberi dorongan turbo sesaat.</div>
+          </div>
+          <div class="mechanic-item">
+            <span class="m-icon">🌀</span>
+            <div><strong>Angin naik:</strong> masuk ke pusaran titik-titik putih untuk naik tanpa mengepak.</div>
+          </div>
+          <div class="mechanic-item">
+            <span class="m-icon">🪶</span>
+            <div><strong>Bulu emas:</strong> +150 poin. Awas pohon, batu, tebing &amp; air!</div>
           </div>
         </div>
+        <div class="controls-table">
+          <div><span>Kepak / naik</span><b>Ayun lengan <i class="k">· <kbd>Spasi</kbd></i><i class="t">· tombol 🪽</i></b></div>
+          <div><span>Belok</span><b>Miring lengan <i class="k">· <kbd>A</kbd> <kbd>D</kbd></i><i class="t">· stik kiri-kanan</i></b></div>
+          <div><span>Naik / turun</span><b>Angkat / turunkan lengan <i class="k">· <kbd>W</kbd> <kbd>S</kbd></i><i class="t">· stik atas-bawah</i></b></div>
+          <div><span>Rem</span><b>Angkat tinggi kedua lengan <i class="k">· <kbd>Shift</kbd></i><i class="t">· tombol 🛑</i></b></div>
+          <div class="k"><span>Ulangi</span><b><kbd>R</kbd></b></div>
+        </div>
         <button id="btn-close-help" class="btn-primary-glow" style="margin-top: 1.5rem; width: 100%;">
-          Close & Resume
+          ▶ Lanjut Terbang
         </button>
       </div>
     </div>
@@ -352,22 +369,22 @@
     <div id="victory-modal" class="game-modal-backdrop">
       <div class="game-modal-card glass-panel-modal victory-card">
         <div class="victory-crown">🏆</div>
-        <h2 class="modal-title">COURSE COMPLETED!</h2>
-        <p class="modal-subtitle">You have conquered the sky archipelago!</p>
+        <h2 class="modal-title">HEBAT!</h2>
+        <p class="modal-subtitle">Kamu menaklukkan kepulauan langit!</p>
 
         <div class="stats-row">
           <div class="stat-box">
-            <span class="stat-label">TIME</span>
+            <span class="stat-label">WAKTU</span>
             <span id="victory-time" class="stat-num">01:42</span>
           </div>
           <div class="stat-box">
-            <span class="stat-label">TOTAL SCORE</span>
+            <span class="stat-label">TOTAL SKOR</span>
             <span id="victory-score" class="stat-num">24,500</span>
           </div>
         </div>
 
         <button id="btn-play-again" class="btn-primary-glow" style="margin-top: 1.5rem; width: 100%;">
-          Fly Course Again
+          Terbang Lagi
         </button>
       </div>
     </div>
@@ -377,7 +394,7 @@
       <div class="game-modal-card glass-panel-modal hangar-card">
         <div class="modal-badge">FLIGHT HANGAR</div>
         <h2 class="modal-title-sm">PILIH SPESIES BURUNG</h2>
-        <p class="modal-subtitle">Setiap burung memiliki keunggulan fisik, kelincahan, dan corak bulu unik</p>
+        <p class="modal-subtitle">Tiap burung punya kecepatan, kelincahan &amp; corak bulu sendiri</p>
 
         <div class="hangar-birds-list" id="hangar-birds-list">
           <!-- Small Bird -->
@@ -385,7 +402,7 @@
             <div class="h-card-header">
               <span class="h-icon">🪽</span>
               <div class="h-info">
-                <div class="h-title">Walet Kilat (Swift Colibri)</div>
+                <div class="h-title">Walet Kilat</div>
                 <div class="h-tag small">KECIL / SUPER LINCAH</div>
               </div>
             </div>
@@ -407,7 +424,7 @@
             <div class="h-card-header">
               <span class="h-icon">🦅</span>
               <div class="h-info">
-                <div class="h-title">Elang Langit (Golden Falcon)</div>
+                <div class="h-title">Elang Langit</div>
                 <div class="h-tag medium">SEDANG / SEIMBANG</div>
               </div>
             </div>
@@ -429,8 +446,8 @@
             <div class="h-card-header">
               <span class="h-icon">🔥</span>
               <div class="h-info">
-                <div class="h-title">Garuda Phoenix (Mythic Phoenix)</div>
-                <div class="h-tag large">BESAR / SOARING GLIDER</div>
+                <div class="h-title">Garuda Phoenix</div>
+                <div class="h-tag large">BESAR / JAGO MELUNCUR</div>
               </div>
             </div>
             <p class="h-desc">Bulu merah kirmizi menyala. Bentang sayap raksasa, meluncur sangat awet dan menukik super kencang.</p>
@@ -448,7 +465,7 @@
         </div>
 
         <button id="btn-close-hangar" class="btn-primary-glow" style="margin-top: 1.5rem; width: 100%;">
-          Tutup & Lanjutkan Terbang
+          ✔ Selesai
         </button>
       </div>
     </div>
@@ -456,8 +473,8 @@
     <!-- Game Over / Flight Crashed Modal -->
     <div id="game-over-modal" class="game-modal-backdrop">
       <div class="game-modal-card glass-panel-modal game-over-card">
-        <div class="modal-badge badge-danger">💥 MISSION FAILED</div>
-        <h2 class="modal-title-danger">FLIGHT CRASHED!</h2>
+        <div class="modal-badge badge-danger">💥 PENERBANGAN BERAKHIR</div>
+        <h2 class="modal-title-danger">ADUH, NABRAK!</h2>
         <p class="modal-subtitle-danger" id="game-over-reason">Burung menabrak tebing batu</p>
 
         <div class="game-over-stats-grid">
@@ -470,11 +487,11 @@
             <span id="game-over-score" class="stat-num">0</span>
           </div>
           <div class="stat-box">
-            <span class="stat-label">CINCIN WAYPOINT</span>
+            <span class="stat-label">CINCIN</span>
             <span id="game-over-rings" class="stat-num">0</span>
           </div>
           <div class="stat-box">
-            <span class="stat-label">SPESIES BURUNG</span>
+            <span class="stat-label">BURUNG</span>
             <span id="game-over-bird" class="stat-num-sm">Elang Langit</span>
           </div>
           <div class="stat-box">
@@ -486,10 +503,10 @@
 
         <div class="modal-actions" style="margin-top: 1.5rem;">
           <button id="btn-retry-crash" class="btn-primary-glow btn-retry-danger">
-            <span>🔄 COBA LAGI (RETRY)</span>
+            <span>🔄 COBA LAGI</span>
           </button>
           <button id="btn-change-bird-crash" class="btn-secondary-flat">
-            🦅 Ganti Tipe Burung (Hangar)
+            🦅 Ganti burung
           </button>
         </div>
       </div>

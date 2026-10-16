@@ -11,6 +11,8 @@ export interface RingData {
   isBoost: boolean;
   meshGroup: THREE.Group;
   pulseMesh: THREE.Mesh;
+  torusMesh: THREE.Mesh;
+  safe: boolean;
 }
 
 /**
@@ -38,14 +40,45 @@ export class WaypointManager {
   private burstLifetimes: number[] = [];
   private burstCount = 80;
 
-  // Beacon guide light on current target ring
-  public activeBeaconLight: THREE.PointLight;
+  // Shared look for every ring
+  private static torusGeo = new THREE.TorusGeometry(8.5, 0.6, 12, 40);
+  private static discGeo = new THREE.RingGeometry(8.5 * 0.2, 8.5 * 0.92, 32);
+  private static ringMat = new THREE.MeshLambertMaterial({ color: 0xffb21f, emissive: 0xff8a00, emissiveIntensity: 0.75 });
+  private static boostMat = new THREE.MeshLambertMaterial({ color: 0x3ff0ff, emissive: 0x00b8e6, emissiveIntensity: 0.85 });
+  private static discMat = new THREE.MeshBasicMaterial({ color: 0xfff1a8, transparent: true, opacity: 0.16, side: THREE.DoubleSide, depthWrite: false });
+  private static boostDiscMat = new THREE.MeshBasicMaterial({ color: 0x9ff8ff, transparent: true, opacity: 0.2, side: THREE.DoubleSide, depthWrite: false });
+
+  /** Set by the game: moves a ring out of obstacles; returns false if terrain there isn't built yet. */
+  public clearSpot: ((pos: THREE.Vector3, radius: number) => boolean) | null = null;
+
+  // Upright light pillar over the current target ring (always world-vertical)
+  private beacon: THREE.Mesh;
+  private beaconMat: THREE.MeshBasicMaterial;
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
 
-    this.activeBeaconLight = new THREE.PointLight(0xffdf00, 3.5, 60);
-    this.scene.add(this.activeBeaconLight);
+    // Soft light pillar: bright at the ring, fading out toward the sky
+    const beaconGeo = new THREE.CylinderGeometry(0.7, 0.7, 220, 10, 8, true);
+    beaconGeo.translate(0, 110 + 9, 0);
+    const fade = new Float32Array(beaconGeo.attributes.position.count);
+    for (let i = 0; i < fade.length; i++) fade[i] = 1 - beaconGeo.attributes.position.getY(i) / 230;
+    beaconGeo.setAttribute('fade', new THREE.BufferAttribute(fade, 1));
+    this.beaconMat = new THREE.MeshBasicMaterial({
+      color: 0xffd34d,
+      transparent: true,
+      opacity: 0.5,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      fog: false
+    });
+    this.beaconMat.onBeforeCompile = (sh) => {
+      sh.vertexShader = 'attribute float fade;\nvarying float vFade;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvFade = fade;');
+      sh.fragmentShader = 'varying float vFade;\n' + sh.fragmentShader.replace('#include <dithering_fragment>', '#include <dithering_fragment>\ngl_FragColor.a *= vFade * vFade;');
+    };
+    this.beacon = new THREE.Mesh(beaconGeo, this.beaconMat);
+    this.beacon.frustumCulled = false;
+    this.scene.add(this.beacon);
 
     this.burstParticles = this.createBurstParticles();
 
@@ -129,40 +162,12 @@ export class WaypointManager {
     ringGroup.position.copy(pos);
     ringGroup.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), forward);
 
-    // Torus geometry
-    const torusGeo = new THREE.TorusGeometry(this.ringRadius, 0.55, 12, 32);
-    const ringMat = new THREE.MeshStandardMaterial({
-      color: isBoost ? 0x00f0ff : 0xffaa00,
-      emissive: isBoost ? 0x00c4e6 : 0xd47500,
-      emissiveIntensity: 0.9,
-      roughness: 0.2,
-      metalness: 0.6
-    });
-    const torusMesh = new THREE.Mesh(torusGeo, ringMat);
+    // Shared geometry/materials: only the torus spins, so the group orientation stays put
+    const torusMesh = new THREE.Mesh(WaypointManager.torusGeo, isBoost ? WaypointManager.boostMat : WaypointManager.ringMat);
     ringGroup.add(torusMesh);
 
-    // Inner pulsating energy disc
-    const pulseGeo = new THREE.RingGeometry(this.ringRadius * 0.15, this.ringRadius * 0.95, 24);
-    const pulseMat = new THREE.MeshBasicMaterial({
-      color: isBoost ? 0x66f6ff : 0xffea88,
-      transparent: true,
-      opacity: 0.35,
-      side: THREE.DoubleSide
-    });
-    const pulseMesh = new THREE.Mesh(pulseGeo, pulseMat);
+    const pulseMesh = new THREE.Mesh(WaypointManager.discGeo, isBoost ? WaypointManager.boostDiscMat : WaypointManager.discMat);
     ringGroup.add(pulseMesh);
-
-    // Vertical sky beacon pillar
-    const beaconGeo = new THREE.CylinderGeometry(0.35, 0.35, 180, 8);
-    beaconGeo.translate(0, 90, 0);
-    const beaconMat = new THREE.MeshBasicMaterial({
-      color: isBoost ? 0x33e7ff : 0xffbe33,
-      transparent: true,
-      opacity: 0.25,
-      side: THREE.DoubleSide
-    });
-    const beacon = new THREE.Mesh(beaconGeo, beaconMat);
-    ringGroup.add(beacon);
 
     this.scene.add(ringGroup);
 
@@ -174,7 +179,9 @@ export class WaypointManager {
       radius: this.ringRadius,
       isBoost,
       meshGroup: ringGroup,
-      pulseMesh
+      pulseMesh,
+      torusMesh,
+      safe: false
     });
 
     this.lastRingPos.copy(pos);
@@ -186,11 +193,6 @@ export class WaypointManager {
   public reorientCourse(birdPos: THREE.Vector3, birdHeading: number): void {
     for (const r of this.rings) {
       this.scene.remove(r.meshGroup);
-      r.meshGroup.traverse((child) => {
-        if ((child as THREE.Mesh).isMesh) {
-          (child as THREE.Mesh).geometry.dispose();
-        }
-      });
     }
     this.rings = [];
     this.combo = 1;
@@ -211,15 +213,14 @@ export class WaypointManager {
   public updateActiveRingVisuals(): void {
     if (this.rings.length > 0) {
       const active = this.rings[0];
-      this.activeBeaconLight.position.copy(active.position);
-      this.activeBeaconLight.color.set(active.isBoost ? 0x00f0ff : 0xffc400);
+      this.beacon.position.copy(active.position);
+      this.beaconMat.color.set(active.isBoost ? 0x5ff4ff : 0xffd34d);
 
       this.rings.forEach((r, idx) => {
-        if (idx === 0) {
-          r.meshGroup.scale.set(1.18, 1.18, 1.18);
-        } else {
-          r.meshGroup.scale.set(1.0, 1.0, 1.0);
-        }
+        // Current target is big & bright; upcoming rings shrink so the path reads front-to-back
+        const s = idx === 0 ? 1.15 : idx === 1 ? 0.95 : 0.85;
+        r.meshGroup.scale.set(s, s, s);
+        r.pulseMesh.visible = idx < 2;
       });
     }
   }
@@ -291,11 +292,6 @@ export class WaypointManager {
     if (index >= 0 && index < this.rings.length) {
       const ring = this.rings.splice(index, 1)[0];
       this.scene.remove(ring.meshGroup);
-      ring.meshGroup.traverse((child) => {
-        if ((child as THREE.Mesh).isMesh) {
-          (child as THREE.Mesh).geometry.dispose();
-        }
-      });
     }
   }
 
@@ -336,10 +332,28 @@ export class WaypointManager {
     // Pulse and rotate rings
     const time = performance.now() * 0.003;
     this.rings.forEach((r, idx) => {
-      r.meshGroup.rotation.z += delta * (idx === 0 ? 1.6 : 0.6);
-      const scale = 0.9 + Math.sin(time + idx) * 0.15;
+      r.torusMesh.rotation.z += delta * (idx === 0 ? 1.6 : 0.6);
+      const scale = 0.9 + Math.sin(time + idx) * 0.12;
       r.pulseMesh.scale.set(scale, scale, 1);
     });
+
+    // Keep rings out of islands, spires and trees once the terrain under them exists
+    if (this.clearSpot) {
+      let movedActive = false;
+      for (let i = 0; i < this.rings.length; i++) {
+        const r = this.rings[i];
+        if (r.safe) continue;
+        const before = r.position.clone();
+        if (this.clearSpot(r.position, r.radius * 1.15)) {
+          r.safe = true;
+          if (!before.equals(r.position)) {
+            r.meshGroup.position.copy(r.position);
+            if (i === 0) movedActive = true;
+          }
+        }
+      }
+      if (movedActive) this.updateActiveRingVisuals();
+    }
 
     // Check if player has completely wandered off the ring track (> 220m away)
     if (birdPos && this.rings.length > 0) {
@@ -376,11 +390,6 @@ export class WaypointManager {
   public reset(): void {
     for (const r of this.rings) {
       this.scene.remove(r.meshGroup);
-      r.meshGroup.traverse((child) => {
-        if ((child as THREE.Mesh).isMesh) {
-          (child as THREE.Mesh).geometry.dispose();
-        }
-      });
     }
     this.rings = [];
     this.collectedCount = 0;

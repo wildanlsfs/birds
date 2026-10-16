@@ -128,7 +128,7 @@ export class MotionTracker {
         downwardAngularSpeed: 0,
         flightState: 'tilt',
         trackingActive: false,
-        statusText: 'Camera standby',
+        statusText: 'Kamera siaga',
         debugGesture: '✈️ TILT MODE',
         tooClose: false
   };
@@ -145,7 +145,7 @@ export class MotionTracker {
   }
 
   public async start(): Promise<boolean> {
-        this.motionData.statusText = 'Accessing camera...';
+        this.motionData.statusText = 'Membuka kamera...';
         console.log('[MotionTracker] Requesting webcam...');
 
       try {
@@ -182,7 +182,7 @@ export class MotionTracker {
                                           }
           });
 
-          this.motionData.statusText = 'Loading Arm Pose Tracker...';
+          this.motionData.statusText = 'Memuat pelacak gerakan...';
               console.log('[MotionTracker] Loading MediaPipe PoseLandmarker with CPU SIMD...');
 
           this.loadAIPoseModel();
@@ -190,7 +190,7 @@ export class MotionTracker {
           return true;
       } catch (err) {
               console.warn('[MotionTracker] Camera failed to start:', err);
-              this.motionData.statusText = 'Camera unavailable. Keyboard mode active!';
+              this.motionData.statusText = 'Kamera tidak tersedia. Pakai keyboard / tombol layar.';
               this.motionData.trackingActive = false;
               return false;
       }
@@ -209,7 +209,7 @@ export class MotionTracker {
 
       this.isCameraRunning = false;
         this.motionData.trackingActive = false;
-        this.motionData.statusText = 'Camera standby';
+        this.motionData.statusText = 'Kamera siaga';
         this.prevLuma = null;
   }
 
@@ -325,11 +325,11 @@ export class MotionTracker {
                                                    );
 
           this.poseLandmarker = await Promise.race([loadPromise, timeout]);
-              this.motionData.statusText = '💪 Arm Tracking Active! Arms straight to tilt, flap to rise, hold to dive!';
+              this.motionData.statusText = '💪 Kamera aktif! Miring = belok · ayun = naik · turunkan lengan = menukik';
               console.log('✅ [MotionTracker] Arm Pose Tracking initialized successfully with lightweight cached assets!');
       } catch (err) {
               console.warn('[MotionTracker] MediaPipe Pose unavailable, using optical arm angle tracker:', err);
-              this.motionData.statusText = '⚡ Optical Arm Tracker Active!';
+              this.motionData.statusText = '⚡ Kamera gerak aktif!';
       } finally {
               this.isModelLoading = false;
       }
