@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { AudioEngine } from './systems/AudioEngine';
+import { HazardManager } from './entities/Hazards';
+import { awardReward, computeReward, getProgress, getSkin, markIntroSeen, buySkin, equipSkin, SKINS, COIN_RULES } from './systems/Progress';
 import { BirdMesh, BirdProfile, BIRD_PROFILES } from './entities/BirdMesh';
 import { World } from './entities/World';
 import { WaypointManager } from './entities/Waypoints';
@@ -19,6 +21,7 @@ class Game {
   private bird: BirdMesh;
   private world: World;
   private waypoints: WaypointManager;
+  private hazards: HazardManager;
   private physics: FlightPhysics;
   private motionTracker: MotionTracker;
   private hud: HUD;
@@ -30,6 +33,7 @@ class Game {
   private lastTime = performance.now();
   private controlMode: 'camera' | 'keyboard' = 'camera';
   private currentBirdType: 'small' | 'medium' | 'large' = 'medium';
+  private hits = 0;
   private feathersCollected = 0;
   private isGameOver = false;
   private cameraShakeTime = 0;
@@ -105,9 +109,11 @@ class Game {
     this.physics = new FlightPhysics();
     this.world = new World(this.scene);
     this.waypoints = new WaypointManager(this.scene);
+    this.hazards = new HazardManager(this.scene);
     this.waypoints.clearSpot = (pos, radius) => this.world.clearRingSpot(pos, radius);
 
     this.bird = new BirdMesh();
+    this.bird.setSkin(getSkin(getProgress().skin).colors);
     this.scene.add(this.bird.group);
 
     // Add contrail lines to scene
@@ -130,6 +136,8 @@ class Game {
     this.setupKeyboardListeners();
     this.setupTouchListeners();
     this.setupUIButtons();
+    this.setupIntro();
+    this.refreshCoinViews();
   }
 
   private async requestWakeLock(): Promise<void> {
@@ -435,6 +443,7 @@ class Game {
     btnOpenHangar?.addEventListener('click', () => {
       this.audio.init();
       this.hud.refreshBestScores();
+      this.renderSkins();
       hangarModal.classList.add('visible');
     });
 
@@ -466,8 +475,111 @@ class Game {
     const btnChangeBirdCrash = document.getElementById('btn-change-bird-crash');
     btnChangeBirdCrash?.addEventListener('click', () => {
       this.hud.hideGameOver();
+      this.renderSkins();
       hangarModal.classList.add('visible');
     });
+  }
+
+
+  // ---------- Intro, rewards, skins ----------
+  private introStep = 0;
+
+  private showIntro(): void {
+    this.introStep = 0;
+    this.renderIntro();
+    document.getElementById('welcome-modal')!.classList.remove('visible');
+    document.getElementById('intro-modal')!.classList.add('visible');
+  }
+
+  private renderIntro(): void {
+    const steps = document.querySelectorAll<HTMLElement>('#intro-modal .intro-step');
+    steps.forEach((el, i) => (el.hidden = i !== this.introStep));
+    document.querySelectorAll('#intro-dots i').forEach((d, i) => d.classList.toggle('on', i === this.introStep));
+    document.getElementById('intro-badge')!.textContent = `LANGKAH ${this.introStep + 1} / ${steps.length}`;
+    document.querySelector('#btn-intro-next span')!.textContent = this.introStep === steps.length - 1 ? 'Mengerti, ayo terbang!' : 'Lanjut';
+  }
+
+  private closeIntro(): void {
+    markIntroSeen();
+    document.getElementById('intro-modal')!.classList.remove('visible');
+    document.getElementById('welcome-modal')!.classList.add('visible');
+    this.refreshCoinViews();
+  }
+
+  private setupIntro(): void {
+    document.getElementById('btn-intro-next')!.addEventListener('click', () => {
+      if (this.introStep >= document.querySelectorAll('#intro-modal .intro-step').length - 1) {
+        this.closeIntro();
+      } else {
+        this.introStep += 1;
+        this.renderIntro();
+      }
+    });
+    document.getElementById('btn-intro-skip')!.addEventListener('click', () => this.closeIntro());
+    document.getElementById('btn-replay-intro')!.addEventListener('click', () => this.showIntro());
+    if (!getProgress().seenIntro) this.showIntro();
+  }
+
+  private refreshCoinViews(): void {
+    const p = getProgress();
+    const w = document.getElementById('welcome-coins');
+    if (w) w.textContent = `🪙 ${p.coins} koin`;
+    const h = document.getElementById('hangar-coins');
+    if (h) h.textContent = `🪙 ${p.coins}`;
+  }
+
+  private renderSkins(): void {
+    const list = document.getElementById('skin-list');
+    if (!list) return;
+    const p = getProgress();
+    this.refreshCoinViews();
+    list.innerHTML = '';
+    for (const skin of SKINS) {
+      const owned = p.unlocked.includes(skin.id);
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.dataset.skin = skin.id;
+      btn.className = 'skin-btn' + (p.skin === skin.id ? ' active' : '') + (owned ? '' : ' locked');
+      const swatch = skin.colors
+        ? [skin.colors.bodyColor, skin.colors.wingColor, skin.colors.tipColor].map((c) => `<i style="background:#${c.toString(16).padStart(6, '0')}"></i>`).join('')
+        : '<i style="background:#7aa7ff"></i><i style="background:#ffc93c"></i><i style="background:#1fb08c"></i>';
+      const label = p.skin === skin.id ? 'Dipakai' : owned ? 'Pakai' : p.coins >= skin.price ? `Beli 🪙${skin.price}` : `🔒 🪙${skin.price}`;
+      btn.innerHTML = `<span class="sk-ico">${skin.icon}</span><span class="sk-sw">${swatch}</span><span class="sk-name">${skin.name}</span><span class="sk-price">${label}</span>`;
+      btn.addEventListener('click', () => {
+        this.audio.init();
+        if (owned) {
+          equipSkin(skin.id);
+        } else {
+          const r = buySkin(skin.id);
+          if (!r.ok) {
+            this.hud.showNotification(`🪙 Koin kurang, butuh ${skin.price}`, 'warning');
+            return;
+          }
+          this.hud.showNotification(`${skin.icon} Skin ${skin.name} terbuka!`, 'boost');
+        }
+        this.bird.setSkin(skin.colors);
+        this.audio.playBirdSelectSound();
+        this.renderSkins();
+      });
+      list.appendChild(btn);
+    }
+  }
+
+  private showRewardSummary(reward: ReturnType<typeof computeReward>, before: number, after: number, next?: { name: string; price: number }): void {
+    const lines: string[] = [];
+    lines.push(`<div><span>Skor ${this.waypoints.totalScore.toLocaleString()} ÷ ${COIN_RULES.scorePerCoin}</span><b>+${reward.fromScore}</b></div>`);
+    lines.push(`<div><span>🪶 ${this.feathersCollected} bulu emas × ${COIN_RULES.perFeather}</span><b>+${reward.fromFeathers}</b></div>`);
+    if (reward.newBestBonus) lines.push(`<div><span>🏆 Rekor baru</span><b>+${reward.newBestBonus}</b></div>`);
+    document.getElementById('reward-lines')!.innerHTML = lines.join('');
+    document.getElementById('reward-total')!.textContent = `+${reward.total}`;
+    document.getElementById('reward-balance')!.textContent = `${after}`;
+    const nextEl = document.getElementById('reward-next')!;
+    nextEl.textContent = next
+      ? after >= next.price
+        ? `✨ Cukup untuk skin ${next.name}! Buka Ganti burung.`
+        : `Skin ${next.name}: kurang ${next.price - after} koin lagi`
+      : 'Semua skin sudah terbuka 🎉';
+    void before;
   }
 
   private selectBirdProfile(type: 'small' | 'medium' | 'large'): void {
@@ -720,6 +832,8 @@ class Game {
 
     // 3. Reset procedural chunks
     this.world.reset();
+    this.hazards.reset();
+    this.hits = 0;
 
     // 4. Reset HUD & stats
     this.hud.reset();
@@ -925,10 +1039,15 @@ class Game {
         });
         const score = this.waypoints.totalScore;
         const rings = this.waypoints.collectedCount;
+        const reward = computeReward(score, this.feathersCollected, isNewBest && score > 0);
+        const before = getProgress();
+        const after = awardReward(reward);
+        const cheapestLocked = SKINS.filter((k) => !after.unlocked.includes(k.id)).sort((a, b) => a.price - b.price)[0];
         this.speedLinesEl.classList.remove('active');
         this.hud.showNotification('💥 BRAK!', 'warning');
         this.gameOverTimer = window.setTimeout(() => {
           this.hud.showGameOver(terrainHit.reason, dist, score, rings, shortName(profile.name), best.distance, isNewBest);
+          this.showRewardSummary(reward, before.coins, after.coins, cheapestLocked);
         }, 900);
       } else if (!terrainHit.isFatal) {
         this.physics.handleTerrainCollision(terrainHit.safeY);
@@ -947,6 +1066,21 @@ class Game {
       } else {
         this.hud.showNotification(`⭕ +${250 * Math.max(1, this.waypoints.combo - 1)}${this.waypoints.combo > 2 ? `  ×${this.waypoints.combo - 1}` : ''}`, 'ring');
       }
+    }
+
+    // 5.5 Flying obstacles: crows and balloons bump you, they never end the flight
+    const hz = this.hazards.update(delta, this.physics.position, this.physics.yaw, this.totalDistanceTraveled, 1.6 * this.physics.birdScale, !this.isGameOver);
+    if (hz.hit) {
+      this.hits += 1;
+      this.physics.knock(hz.awayX, hz.awayZ);
+      this.waypoints.combo = 1;
+      this.audio.playCrashSound();
+      this.cameraShakeTime = 0.35;
+      this.cameraShakeIntensity = 1.2;
+      this.hud.showNotification(hz.hit === 'gagak' ? '🐦‍⬛ AWAS GAGAK! Combo hilang' : '🎈 NABRAK BALON! Combo hilang', 'warning');
+    } else if (hz.nearMiss) {
+      this.waypoints.totalScore += 50;
+      this.hud.showNotification('😎 LOLOS TIPIS +50', 'feather');
     }
 
     // Distance Milestone Celebrations (every 1000m)

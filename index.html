@@ -170,6 +170,44 @@
       </div>
     </div>
 
+    <!-- First-visit step-by-step intro -->
+    <div id="intro-modal" class="game-modal-backdrop">
+      <div class="game-modal-card glass-panel-modal intro-card">
+        <div class="modal-badge" id="intro-badge">LANGKAH 1 / 4</div>
+        <div class="intro-dots" id="intro-dots"><i class="on"></i><i></i><i></i><i></i></div>
+        <div class="intro-step" data-step="0">
+          <div class="intro-art">🪽</div>
+          <h2 class="modal-title-sm">1. Kepakkan sayap</h2>
+          <p class="modal-subtitle">Ayun kedua lengan ke bawah untuk naik. Tanpa kamera: tekan <kbd>Spasi</kbd> atau tombol 🪽.</p>
+        </div>
+        <div class="intro-step" data-step="1" hidden>
+          <div class="intro-art">✈️</div>
+          <h2 class="modal-title-sm">2. Belok &amp; menukik</h2>
+          <p class="modal-subtitle">Miringkan lengan untuk belok. Turunkan lengan untuk <b>menukik</b>: sayap melipat ke belakang dan kamu melesat cepat!</p>
+        </div>
+        <div class="intro-step" data-step="2" hidden>
+          <div class="intro-art">⭕</div>
+          <h2 class="modal-title-sm">3. Kejar hadiah</h2>
+          <div class="reward-table">
+            <div><span>⭕ Cincin emas</span><b>+250 × combo</b></div>
+            <div><span>🚀 Cincin biru</span><b>turbo!</b></div>
+            <div><span>🪶 Bulu emas</span><b>+150 &amp; 3 🪙</b></div>
+            <div><span>😎 Lolos tipis dari rintangan</span><b>+50</b></div>
+            <div><span>🪙 Tiap 100 skor</span><b>+1 koin</b></div>
+          </div>
+        </div>
+        <div class="intro-step" data-step="3" hidden>
+          <div class="intro-art">🐦‍⬛🎈</div>
+          <h2 class="modal-title-sm">4. Awas rintangan terbang!</h2>
+          <p class="modal-subtitle">Gagak dan balon udara menghalangi jalan. Kalau tertabrak kamu <b>tidak jatuh</b>, tapi melambat dan combo hilang. Koin dipakai untuk beli <b>skin</b> burung di Hangar.</p>
+        </div>
+        <div class="modal-actions" style="margin-top: 1.2rem;">
+          <button id="btn-intro-next" class="btn-primary-glow"><span>Lanjut</span><span class="btn-arrow">➔</span></button>
+          <button id="btn-intro-skip" class="btn-secondary-flat">Lewati</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Interactive Welcome / Start Modal -->
     <div id="welcome-modal" class="game-modal-backdrop visible">
       <div class="game-modal-card glass-panel-modal">
@@ -241,6 +279,7 @@
         </div>
 
         <div class="modal-actions">
+          <div class="coin-line" id="welcome-coins">🪙 0 koin</div>
           <button id="btn-start-game" class="btn-primary-glow">
             <span>📷 MAIN PAKAI KAMERA</span>
             <span class="btn-arrow">➔</span>
@@ -248,6 +287,7 @@
           <button id="btn-start-keyboard" class="btn-secondary-flat">
             Main pakai keyboard / layar sentuh
           </button>
+          <button id="btn-replay-intro" class="btn-secondary-flat">❓ Cara main &amp; hadiah</button>
         </div>
       </div>
     </div>
@@ -349,7 +389,15 @@
           </div>
           <div class="mechanic-item">
             <span class="m-icon">🪶</span>
-            <div><strong>Bulu emas:</strong> +150 poin. Awas pohon, batu, tebing &amp; air!</div>
+            <div><strong>Bulu emas:</strong> +150 poin &amp; 3 koin. Awas pohon, batu, tebing &amp; air!</div>
+          </div>
+          <div class="mechanic-item">
+            <span class="m-icon">🐦‍⬛</span>
+            <div><strong>Gagak &amp; balon:</strong> tertabrak = melambat &amp; combo hilang. Lolos tipis +50.</div>
+          </div>
+          <div class="mechanic-item">
+            <span class="m-icon">🪙</span>
+            <div><strong>Koin:</strong> 1 koin tiap 100 skor, +3 per bulu, +20 kalau rekor baru. Tukar dengan skin di Hangar.</div>
           </div>
         </div>
         <div class="controls-table">
@@ -464,6 +512,11 @@
           </div>
         </div>
 
+        <div class="skin-section">
+          <div class="skin-head"><h3>🎨 Skin burung</h3><span class="coin-line" id="hangar-coins">🪙 0</span></div>
+          <div class="skin-list" id="skin-list"></div>
+        </div>
+
         <button id="btn-close-hangar" class="btn-primary-glow" style="margin-top: 1.5rem; width: 100%;">
           ✔ Selesai
         </button>
@@ -499,6 +552,13 @@
             <span id="game-over-best" class="stat-num">0m</span>
             <span id="game-over-new-best" class="new-best-badge" style="display: none;">🏆 REKOR BARU!</span>
           </div>
+        </div>
+
+        <div class="reward-box" id="game-over-reward">
+          <div class="reward-title">🪙 Hadiah penerbangan ini</div>
+          <div class="reward-lines" id="reward-lines"></div>
+          <div class="reward-total">Total <b id="reward-total">+0</b> koin · saldo <b id="reward-balance">0</b></div>
+          <div class="reward-next" id="reward-next"></div>
         </div>
 
         <div class="modal-actions" style="margin-top: 1.5rem;">

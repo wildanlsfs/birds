@@ -243,6 +243,15 @@ export class FlightPhysics {
   /**
    * Apply ring turbo booster
    */
+  /** Bump from a flying obstacle: lose speed and get shoved sideways. Never fatal. */
+  public knock(awayX: number, awayZ: number): void {
+    this.forwardSpeed = Math.max(this.minSpeed, this.forwardSpeed * 0.55);
+    this.boostTimer = 0;
+    // velocity x/z is rebuilt every frame, so the shove is applied to the position
+    this.position.x += awayX * 5;
+    this.position.z += awayZ * 5;
+  }
+
   public triggerBoost(): void {
     this.boostTimer = 2.2;
     this.forwardSpeed = Math.min(this.maxSpeed, this.forwardSpeed + 16);

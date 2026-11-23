@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import type { SkinColors } from '../systems/Progress';
 
 export interface BirdProfile {
   id: 'small' | 'medium' | 'large';
@@ -193,6 +194,7 @@ export class BirdMesh {
   private trailMaxPoints = 40;
 
   // Animation state
+  private skinColors: SkinColors | null = null;
   private flapPhase = 0;
   private diveAmt = 0;
   private flapIntensity = 1.0;
@@ -219,7 +221,14 @@ export class BirdMesh {
     this.applyProfile(profile);
   }
 
-  private applyProfile(profile: BirdProfile): void {
+  /** Cosmetic palette over the species colors (null = species' own). Rebuilds the model. */
+  public setSkin(colors: SkinColors | null): void {
+    this.skinColors = colors;
+    this.applyProfile(this.currentProfile);
+  }
+
+  private applyProfile(base: BirdProfile): void {
+    const profile: BirdProfile = this.skinColors ? { ...base, ...this.skinColors } : base;
     // Rebuild the model for the species (shapes differ, not just colors)
     for (const child of [...this.rig.children]) {
       this.rig.remove(child);
