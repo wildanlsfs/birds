@@ -194,6 +194,7 @@ export class BirdMesh {
 
   // Animation state
   private flapPhase = 0;
+  private diveAmt = 0;
   private flapIntensity = 1.0;
   private glidePhase = 0;
   private bob = 0;
@@ -408,6 +409,12 @@ export class BirdMesh {
     return { left: make(), right: make() };
   }
 
+  /** Asymmetric wingbeat in [-1, 1]: +1 wings up, -1 wings down. Downstroke takes 40% of the cycle. */
+  private static wingbeat(phase: number): number {
+    const u = (((phase / (Math.PI * 2)) % 1) + 1) % 1;
+    return u < 0.4 ? Math.cos((Math.PI * u) / 0.4) : -Math.cos((Math.PI * (u - 0.4)) / 0.6);
+  }
+
   public triggerFlapBurst(): void {
     this.flapIntensity = 1.3;
   }
@@ -436,12 +443,15 @@ export class BirdMesh {
     const damp = THREE.MathUtils.damp;
     this.flapIntensity = damp(this.flapIntensity, 1, 3, dt);
 
-    // Dive folds the wings back, braking/climbing spreads them up
-    const dive = THREE.MathUtils.clamp((-pitch - 0.1) * 1.4, 0, 0.8);
+    // Dive folds the wings back like a falcon stoop; climbing/braking spreads them up
+    const diveTarget = THREE.MathUtils.clamp((-pitch - 0.05) * 2.2, 0, 1);
+    this.diveAmt = damp(this.diveAmt, diveTarget, 7, dt);
+    const dive = this.diveAmt;
     const flare = THREE.MathUtils.clamp((pitch - 0.15) * 1.2, 0, 0.4);
 
     let shoulderL: number;
     let elbowL: number;
+    let twist = 0;
 
     if (cameraMotion && cameraMotion.isCameraMode) {
       // Direct arm tracking (mirrored webcam): +X wing follows the player's right arm, -X the left.
@@ -452,13 +462,17 @@ export class BirdMesh {
       this.flapPhase += dt * 3.5;
     } else {
       if (isFlapping) {
-        // Powerful wingbeat: big downstroke, elbow lagging behind the shoulder
+        // Asymmetric wingbeat: quick powerful downstroke (40% of the cycle), slower recovering upstroke
         this.flapPhase += dt * 10.5;
-        const amp = 0.62 * this.flapIntensity;
-        const stroke = Math.sin(this.flapPhase);
-        shoulderL = stroke * amp + 0.12;
-        elbowL = -Math.sin(this.flapPhase - 0.7) * amp * 0.6;
-        this.bob = Math.cos(this.flapPhase) * 0.08;
+        const amp = 0.8 * this.flapIntensity;
+        const stroke = BirdMesh.wingbeat(this.flapPhase);
+        const lagged = BirdMesh.wingbeat(this.flapPhase - 0.9);
+        shoulderL = stroke * amp + 0.1;
+        // Hand trails the arm: bends down on the downstroke, lifts and folds in on the upstroke
+        elbowL = lagged * amp * 0.75 - 0.15;
+        // Leading edge dips on the downstroke so the wing bites the air
+        twist = (BirdMesh.wingbeat(this.flapPhase + 0.35) - stroke) * 0.5;
+        this.bob = Math.cos(this.flapPhase) * 0.1;
       } else {
         // Soaring: wings held in a gentle dihedral with a slow breathing sway
         this.glidePhase += dt * 1.6;
@@ -466,6 +480,9 @@ export class BirdMesh {
         elbowL = -0.06 + Math.sin(this.glidePhase - 0.6) * 0.03;
         this.bob = damp(this.bob, 0, 4, dt);
       }
+      // A stooping bird tucks its wings: less flapping, arms lowered slightly, hands folded down
+      shoulderL = shoulderL * (1 - dive * 0.75) - dive * 0.2;
+      elbowL = elbowL * (1 - dive * 0.6) - dive * 0.35;
       // Positive = wingtips up. The +X wing lifts with +rotation.z, the -X wing with -rotation.z.
       const rate = isFlapping ? 30 : 6;
       this.leftWingRoot.rotation.z = damp(this.leftWingRoot.rotation.z, shoulderL, rate, dt);
@@ -474,11 +491,15 @@ export class BirdMesh {
       this.rightOuterWing.rotation.z = damp(this.rightOuterWing.rotation.z, -elbowL, rate, dt);
     }
 
-    // Sweep back on dives (both modes)
-    this.leftWingRoot.rotation.y = damp(this.leftWingRoot.rotation.y, -dive * 0.9, 8, dt);
-    this.rightWingRoot.rotation.y = damp(this.rightWingRoot.rotation.y, dive * 0.9, 8, dt);
-    this.leftOuterWing.rotation.y = damp(this.leftOuterWing.rotation.y, -dive * 0.6, 8, dt);
-    this.rightOuterWing.rotation.y = damp(this.rightOuterWing.rotation.y, dive * 0.6, 8, dt);
+    // Wing twist (flap) and swept-back pose (dive): the +X wing sweeps back with negative rotation.y
+    const sweepRoot = dive * 1.1;
+    const sweepHand = dive * 0.75;
+    this.leftWingRoot.rotation.x = damp(this.leftWingRoot.rotation.x, twist, 20, dt);
+    this.rightWingRoot.rotation.x = damp(this.rightWingRoot.rotation.x, twist, 20, dt);
+    this.leftWingRoot.rotation.y = damp(this.leftWingRoot.rotation.y, -sweepRoot, 9, dt);
+    this.rightWingRoot.rotation.y = damp(this.rightWingRoot.rotation.y, sweepRoot, 9, dt);
+    this.leftOuterWing.rotation.y = damp(this.leftOuterWing.rotation.y, -sweepHand, 9, dt);
+    this.rightOuterWing.rotation.y = damp(this.rightOuterWing.rotation.y, sweepHand, 9, dt);
 
     this.rig.position.y = this.bob;
 
