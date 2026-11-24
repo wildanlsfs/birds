@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { CAM_VIDEO, lowLightTune, LightMeter, brightFrame, DARK_HINT_ID, DIM_HINT_ID } from './CamLight';
 
 type PoseLandmarker = import('@mediapipe/tasks-vision').PoseLandmarker;
 
@@ -33,6 +34,7 @@ export interface MotionData {
     statusText: string;
     debugGesture: string;       // e.g. "✈️ TILT MODE", "⬇️ MENUKIK", "🪽 FLAP NAIK"
     tooClose: boolean;          // Shoulders/arms fill too much of the frame for reliable tracking
+    lightHint: string;          // Indonesian low-light hint, '' when lighting is fine
 }
 
 // Arm & upper torso connection indices for MediaPipe Pose
@@ -130,13 +132,27 @@ export class MotionTracker {
         trackingActive: false,
         statusText: 'Kamera siaga',
         debugGesture: '✈️ TILT MODE',
-        tooClose: false
+        tooClose: false,
+        lightHint: ''
   };
+
+  // Low-light: meter + downscaled pose input (keeps pose cost flat at 720p)
+  private lightMeter: LightMeter;
+  private poseCanvas: HTMLCanvasElement;
+  private poseCtx: CanvasRenderingContext2D | null;
+  private readonly poseW = 384;
+  private poseH = 216;
+  private lastPoseTime = 0;
 
   constructor(videoElement: HTMLVideoElement, previewCanvas: HTMLCanvasElement) {
         this.video = videoElement;
         this.canvas = previewCanvas;
         this.ctx = this.canvas.getContext('2d');
+        this.lightMeter = new LightMeter(videoElement);
+        this.poseCanvas = document.createElement('canvas');
+        this.poseCanvas.width = this.poseW;
+        this.poseCanvas.height = this.poseH;
+        this.poseCtx = this.poseCanvas.getContext('2d');
 
       this.diffCanvas = document.createElement('canvas');
         this.diffCanvas.width = this.gridW;
@@ -150,12 +166,7 @@ export class MotionTracker {
 
       try {
               const streamPromise = navigator.mediaDevices.getUserMedia({
-                        video: {
-                                    width: { ideal: 480, max: 640 },
-                                    height: { ideal: 360, max: 480 },
-                                    facingMode: 'user',
-                                    frameRate: { ideal: 24, max: 30 }
-                        },
+                        video: CAM_VIDEO,
                         audio: false
               });
 
@@ -165,6 +176,7 @@ export class MotionTracker {
 
           const stream = await Promise.race([streamPromise, timeoutPromise]);
               this.video.srcObject = stream;
+              lowLightTune(stream.getVideoTracks()[0]).catch(() => {});
 
           await new Promise<void>((resolve) => {
                     const onReady = () => {
@@ -364,7 +376,7 @@ export class MotionTracker {
 
           try {
                     if (this.poseLandmarker) {
-                                const results = this.poseLandmarker.detectForVideo(this.video, now);
+                                const results = this.poseLandmarker.detectForVideo(this.getPoseInput(videoW, videoH), this.nextPoseTimestamp(now));
                                 this.processArmPoseLandmarks(results, now);
                     } else {
                                 this.processOpticalArmFallback(now);
@@ -376,9 +388,30 @@ export class MotionTracker {
           }
 
           this.renderPreview();
+
+          this.lightMeter.sample(now);
+          const lvl = this.lightMeter.level;
+          this.motionData.lightHint = lvl === 'dark' ? DARK_HINT_ID : lvl === 'dim' ? DIM_HINT_ID : '';
       }
 
       return this.motionData;
+  }
+
+  /** Pose-model input: always a downscaled canvas (cheap at 720p), brightened when the room is dark. */
+  private getPoseInput(videoW: number, videoH: number): HTMLCanvasElement | HTMLVideoElement {
+        const h = Math.max(2, Math.round(this.poseW * (videoH / videoW)));
+        const src = brightFrame(this.video, this.lightMeter.gain, this.poseW, h);
+        if (src !== this.video) return src as HTMLCanvasElement;
+        if (!this.poseCtx) return this.video;
+        if (this.poseCanvas.height !== h) this.poseCanvas.height = h;
+        this.poseCtx.drawImage(this.video, 0, 0, this.poseW, h);
+        return this.poseCanvas;
+  }
+
+  /** MediaPipe VIDEO mode needs strictly increasing timestamps. */
+  private nextPoseTimestamp(now: number): number {
+        this.lastPoseTime = Math.max(now, this.lastPoseTime + 1);
+        return this.lastPoseTime;
   }
 
   /**

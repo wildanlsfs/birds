@@ -728,6 +728,14 @@ class Game {
       msgEl.textContent = state.statusMessage;
     }
 
+    // Low-light hint (empty when lighting is fine)
+    const lightEl = document.getElementById('calib-light-hint');
+    if (lightEl) {
+      const hint = this.motionTracker.getMotionData().lightHint;
+      if (lightEl.textContent !== hint) lightEl.textContent = hint;
+      lightEl.hidden = !hint;
+    }
+
     // Too Close warning — highlight the feedback box while it blocks progress
     document.getElementById('calib-feedback')?.classList.toggle('warning', state.tooClose);
 
@@ -913,7 +921,7 @@ class Game {
       isFlapping = currentMotion.isFlapping && this.flapCooldown <= 0;
       isBraking = currentMotion.isBraking || this.keyState.brake;
       flapIntensity = currentMotion.flapIntensity;
-      trackingStatus = currentMotion.statusText;
+      trackingStatus = currentMotion.lightHint || currentMotion.statusText;
 
       if (currentMotion.tooClose && !this.wasTooCloseToCam) {
         this.hud.showNotification('⚠️ MUNDUR SEDIKIT DARI KAMERA', 'warning');

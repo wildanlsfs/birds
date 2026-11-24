@@ -1062,6 +1062,8 @@ kbd {
   text-align: left;
 }
 
+.calib-feedback-box[hidden] { display: none; }
+
 .feedback-pulse {
   width: 8px;
   height: 8px;
